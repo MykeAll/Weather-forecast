@@ -1,0 +1,13 @@
+{
+  "name": "Atmosphere",
+  "description": "A deeply immersive weather experience featuring real-time atmospheric animations, precision forecasting, and a meticulously crafted interface designed to make checking the weather a highlight of your day.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "Geocoding",
+    "Real-time Forecasting",
+    "Dynamic Atmospheric Animations"
+  ]
+}
