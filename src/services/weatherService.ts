@@ -161,7 +161,7 @@ export async function searchLocations(query: string): Promise<SearchSuggestion[]
 }
 
 export async function getWeatherData(lat: number, lon: number, locationName: string, country: string): Promise<WeatherData> {
-  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,uv_index,visibility,surface_pressure,cloud_cover,precipitation&hourly=temperature_2m,apparent_temperature,weather_code,is_day,precipitation,cloud_cover,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,precipitation_sum&timezone=auto&forecast_days=7`;
+  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,uv_index,visibility,surface_pressure,cloud_cover,precipitation&hourly=temperature_2m,apparent_temperature,weather_code,is_day,precipitation,precipitation_probability,cloud_cover,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,precipitation_sum&timezone=auto&forecast_days=7`;
   const pollenUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen,european_aqi,pm10,pm2_5,nitrogen_dioxide,sulphur_dioxide,ozone,carbon_monoxide`;
   
   try {
@@ -171,21 +171,24 @@ export async function getWeatherData(lat: number, lon: number, locationName: str
     ]);
 
     if (weatherRes.status === 429 || airQualityRes.status === 429) {
-      throw new Error('API limit reached. Please try again later.');
-    }
+      throw new Error('SYSTEM_LIMIT_REACHED: API rate limit exceeded. Our satellite links are busy. Please try again in a few minutes.');
+}
 
     if (!weatherRes.ok || !airQualityRes.ok) {
-      throw new Error(`Satellite link unstable (Status: ${weatherRes.status}/${airQualityRes.status})`);
-    }
+      if (weatherRes.status >= 500) {
+        throw new Error('SAT_COMM_FAILURE: Weather telemetry servers are currently offline for maintenance.');
+      }
+      throw new Error(`LINK_UNSTABLE: Satellite link unstable (Status: ${weatherRes.status}/${airQualityRes.status}). Check your connection.`);
+}
 
     const weatherData = await weatherRes.json();
     const airQualityData = await airQualityRes.json();
 
     if (weatherData.error) {
-      if (weatherData.reason?.includes('location')) {
-        throw new Error('Location coordinates out of bounds or invalid.');
+      if (weatherData.reason?.toLowerCase().includes('location')) {
+        throw new Error('INVALID_COORDINATES: The requested location coordinates are out of bounds or unrecognized by our systems.');
       }
-      throw new Error(weatherData.reason || 'Telemetry data corrupted');
+      throw new Error(`TELEMETRY_GARD: ${weatherData.reason || 'Data stream corrupted during transmission.'}`);
     }
     
     const current = weatherData.current;
@@ -251,6 +254,7 @@ export async function getWeatherData(lat: number, lon: number, locationName: str
         feelsLike: Math.round(weatherData.hourly.apparent_temperature[i]),
         conditionCode: weatherData.hourly.weather_code[i],
         precipitation: weatherData.hourly.precipitation[i],
+        precipitationProbability: weatherData.hourly.precipitation_probability ? weatherData.hourly.precipitation_probability[i] : 0,
         cloudCover: weatherData.hourly.cloud_cover[i],
         uvIndex: weatherData.hourly.uv_index[i],
         isDay: weatherData.hourly.is_day[i] === 1,

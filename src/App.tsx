@@ -53,7 +53,21 @@ export default function App() {
       setTimeout(() => setShowSuccess(false), 2000);
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : 'Could not update weather. Please try again.');
+      let userMessage = 'Could not update weather. Please try again.';
+      if (err instanceof Error) {
+        if (err.message.includes('SYSTEM_LIMIT_REACHED')) {
+          userMessage = 'ATMOSPHERIC_BUSY: Our satellite bandwidth is temporarily capped. Retrying in automated sequence...';
+        } else if (err.message.includes('SAT_COMM_FAILURE')) {
+          userMessage = 'COMM_FAILURE: Weather telemetry hubs are currently unresponsive. Maintenance in progress.';
+        } else if (err.message.includes('INVALID_COORDINATES')) {
+          userMessage = 'COORDINATE_ERROR: These coordinates appear outside mapped sectors. Telemetry unavailable.';
+        } else if (err.message.includes('LINK_UNSTABLE')) {
+          userMessage = 'LINK_UNSTABLE: Data packet loss detected. Check your local mesh connection.';
+        } else {
+          userMessage = err.message;
+        }
+      }
+      setError(userMessage);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -129,6 +143,8 @@ export default function App() {
         latitude={weather?.location.lat}
         longitude={weather?.location.lon}
         mode={backgroundMode}
+        windSpeed={weather?.current.windSpeed}
+        temperature={weather?.current.temp}
       />
       
       <main className={cn(
@@ -138,38 +154,51 @@ export default function App() {
         {/* Header / Search */}
         <div className={cn(
           "mb-12 pointer-events-none transition-all duration-700",
-          backgroundMode === 'globe' ? "p-6 lg:fixed lg:top-0 lg:left-0 lg:w-full lg:z-50" : ""
+          backgroundMode === 'globe' ? "p-6 lg:fixed lg:top-0 lg:left-0 lg:w-full lg:z-[60] bg-black/20 backdrop-blur-md border-b border-white/5" : 
+          backgroundMode === 'radar' ? "p-4 sm:p-6 fixed top-0 left-0 w-full z-[60] bg-transparent" : ""
         )}>
           <div className={cn(
-            "flex justify-between gap-8 mb-12",
-            backgroundMode === 'globe' ? "flex-row items-center max-w-7xl mx-auto" : "flex-col md:flex-row items-center"
+            "flex gap-4 sm:gap-8 mb-12",
+            (backgroundMode === 'globe' || backgroundMode === 'radar') 
+              ? "flex-col sm:flex-row items-start sm:items-center justify-between max-w-7xl mx-auto mb-0" 
+              : "flex-col md:flex-row items-center justify-between"
           )}>
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-3 shrink-0 pointer-events-auto"
+              className={cn(
+                "flex items-center gap-3 shrink-0 pointer-events-auto",
+                backgroundMode === 'radar' && "drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
+              )}
             >
               <div 
                 style={{ borderWidth: '1px', borderColor: '#f1eaea' }}
                 className={cn(
-                  "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-700 cursor-pointer",
+                  "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-700 cursor-pointer shadow-md",
+                  backgroundMode === 'radar' ? "bg-black/60 border-white/20" :
                   backgroundMode === 'atmosphere' 
-                    ? "bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg" 
-                    : "bg-transparent border-transparent"
+                    ? "bg-black/60 backdrop-blur-xl border border-white/20 shadow-lg shadow-black/20" 
+                    : "bg-white/5 backdrop-blur-md border border-white/10"
                 )}
               >
                 <WeatherIcon code={weather?.current.conditionCode || 0} isDay={isDay} size={28} />
               </div>
               <div className="flex flex-col items-start gap-2">
-                <h1 className="text-2xl font-bold tracking-tight">Atmosphere</h1>
+                <h1 className={cn(
+                   "text-2xl font-bold tracking-tight text-white underline",
+                   backgroundMode === 'radar' ? "text-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" : "text-shadow-md"
+                )}>
+                  Atmosphere
+                </h1>
                 <div className="flex flex-wrap gap-2">
                   <span 
                     style={{ borderWidth: '1.4px', borderColor: '#dad8d8' }}
                     className={cn(
-                      "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700",
+                      "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700 shadow-sm",
+                      backgroundMode === 'radar' ? "text-white text-shadow-sm bg-black/40 border-white/20" :
                       backgroundMode === 'atmosphere'
-                        ? "text-white/40 bg-white/5 backdrop-blur-md border border-white/10"
-                        : "text-white/60 bg-transparent border-transparent"
+                        ? "text-white/40 bg-black/60 backdrop-blur-md border border-white/10"
+                        : "text-white/80 bg-black/20 backdrop-blur-sm border border-white/10"
                     )}
                   >
                     {weather 
@@ -177,12 +206,13 @@ export default function App() {
                       : format(currentTime, 'EEEE, MMMM do')}
                   </span>
                   <span 
-                    style={{ borderWidth: '3px', borderColor: '#f0e8e8', backgroundColor: '#3c71d7' }}
+                    style={{ borderWidth: '3px', borderColor: '#f0e8e8', backgroundColor: backgroundMode === 'radar' ? '#1e3a8a' : '#1e3a8a' }}
                     className={cn(
-                      "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700",
+                      "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700 shadow-sm",
+                      backgroundMode === 'radar' ? "text-white text-shadow-[0_1px_2px_rgba(0,0,0,0.5)] border-white/30" :
                       backgroundMode === 'atmosphere'
-                        ? "text-white/40 bg-white/5 backdrop-blur-md border border-white/10"
-                        : "text-white/60 bg-transparent border-transparent"
+                        ? "text-white/80 bg-black/60 backdrop-blur-md border border-white/10 text-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                        : "text-white/80 bg-black/20 backdrop-blur-sm border border-white/10"
                     )}
                   >
                     {weather 
@@ -191,12 +221,13 @@ export default function App() {
                   </span>
                   {weather?.location.timezone && (
                     <span 
-                      style={{ borderWidth: '1.8px', borderColor: '#24c2e7' }}
+                      style={{ borderWidth: '1.8px', borderColor: '#24c2e7', backgroundColor: 'rgba(0,0,0,0.6)' }}
                       className={cn(
-                        "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700",
+                        "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700 shadow-sm",
+                        backgroundMode === 'radar' ? "text-sky-300 text-shadow-sm border-white/20" :
                         backgroundMode === 'atmosphere'
-                          ? "text-sky-400/60 bg-sky-400/5 backdrop-blur-md border border-sky-400/10"
-                          : "text-sky-400 bg-transparent border-transparent"
+                          ? "text-sky-400/80 bg-black/60 backdrop-blur-md border border-white/10"
+                          : "text-sky-400 bg-black/20 backdrop-blur-sm border border-sky-400/10"
                       )}
                     >
                       {weather.location.timezone.replace('_', ' ')}
@@ -206,7 +237,10 @@ export default function App() {
               </div>
             </motion.div>
             
-              <div className="flex-1 w-full flex items-center gap-4 pointer-events-auto">
+              <div className={cn(
+                "flex-1 w-full flex items-center gap-4 pointer-events-auto",
+                backgroundMode === 'radar' && "drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
+              )}>
                 <SearchBar 
                   onSelect={(s) => setPendingLocation(s)}
                   onLocate={handleLocate}
@@ -220,8 +254,14 @@ export default function App() {
                       animate={{ opacity: 1, x: 0 }}
                       className="hidden sm:flex flex-col items-end mr-2"
                     >
-                      <span className="text-[8px] font-black uppercase tracking-widest text-white/20 leading-none mb-1">Last Alignment</span>
-                      <span className="text-[10px] font-medium text-sky-400/40 tabular-nums">
+                      <span className={cn(
+                        "text-[8px] font-black uppercase tracking-widest leading-none mb-1",
+                        backgroundMode === 'radar' ? "text-white/40 text-shadow-sm" : "text-white/20"
+                      )}>Last Alignment</span>
+                      <span className={cn(
+                        "text-[10px] font-medium tabular-nums",
+                        backgroundMode === 'radar' ? "text-sky-300 text-shadow-sm font-bold" : "text-sky-400/40"
+                      )}>
                         {format(lastUpdated, 'HH:mm:ss')}
                       </span>
                     </motion.div>
@@ -242,10 +282,12 @@ export default function App() {
                     disabled={loading || isRefreshing}
                     style={{ borderColor: '#f0e9e9', borderWidth: '2px' }}
                     className={cn(
-                      "relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 overflow-hidden group duration-700 cursor-pointer",
+                      "relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 overflow-hidden group duration-700 cursor-pointer shadow-md",
+                      backgroundMode === 'radar' ? "bg-black/60 border-white/20 shadow-black/40" :
                       backgroundMode === 'atmosphere'
-                        ? "bg-white/10 backdrop-blur-xl border border-white/20 hover:bg-white/20"
-                        : "bg-transparent border-transparent hover:bg-white/5",
+                        ? "bg-black/60 backdrop-blur-xl border border-white/20 hover:bg-black/70 shadow-lg shadow-black/20"
+                        : "bg-black/40 backdrop-blur-md border border-white/10 hover:bg-white/10",
+                      backgroundMode === 'radar' && "drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]",
                       isRefreshing && "border-sky-500/50 shadow-[0_0_20px_rgba(56,189,248,0.3)]",
                       showSuccess && "border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.3)]"
                     )}
@@ -524,7 +566,7 @@ export default function App() {
                     </motion.p>
                   </div>
                   
-                  <div className="flex flex-col items-center gap-6 pt-4">
+                <div className="flex flex-col items-center gap-4 pt-1 sm:pt-4">
                     <div className="flex items-center gap-3">
                       <motion.div 
                         animate={{ scale: [1, 1.4, 1], opacity: [0.6, 1, 0.6] }}
@@ -532,7 +574,7 @@ export default function App() {
                         className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.6)]"
                       />
                       <motion.p 
-                        className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em]"
+                        className="text-[9px] sm:text-[10px] font-black text-white/40 uppercase tracking-[0.4em] sm:tracking-[0.5em]"
                       >
                         Celestial System: Optimized
                       </motion.p>
@@ -612,8 +654,10 @@ export default function App() {
           )}>
             <div className={cn(
               "transition-all duration-1000 flex flex-col",
-              backgroundMode === 'globe' 
-                ? "fixed bottom-12 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 pointer-events-auto z-50" 
+              backgroundMode === 'radar'
+                ? "fixed bottom-0 left-0 w-full px-0 pointer-events-auto z-[90]"
+              : backgroundMode === 'globe'
+                ? "fixed bottom-12 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 pointer-events-auto z-40" 
                 : "flex-1 max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8"
             )}>
               {/* High-Impact Hero Section */}
@@ -622,10 +666,12 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 className={cn(
-                  "relative rounded-[40px] overflow-hidden group transition-all duration-700 shrink-0 shadow-2xl",
-                  backgroundMode === 'globe'
-                    ? "p-8 bg-black/40 backdrop-blur-3xl border border-white/10"
-                    : "p-8 sm:p-12 bg-white/5 backdrop-blur-3xl border border-white/10"
+                   "relative rounded-none overflow-hidden group transition-all duration-700 shrink-0",
+                   backgroundMode === 'radar'
+                     ? "p-4 px-6 md:px-12 bg-transparent border-none rounded-none shadow-none"
+                     : backgroundMode === 'globe'
+                     ? "p-8 bg-black/40 backdrop-blur-3xl border border-white/10 rounded-[40px]"
+                     : "p-8 sm:p-12 bg-white/5 backdrop-blur-3xl border border-white/10 shadow-2xl rounded-[40px]"
                 )}
               >
                 {backgroundMode === 'atmosphere' && (
@@ -640,89 +686,123 @@ export default function App() {
                 )}
 
                 <div className={cn(
-                  "relative z-10 flex flex-col gap-8",
-                  backgroundMode !== 'globe' ? "md:flex-row md:items-center justify-between" : "items-center"
+                  "relative z-10 flex flex-col gap-6",
+                  backgroundMode === 'radar' ? "md:flex-row md:items-center md:justify-between w-full gap-4" :
+                  (backgroundMode !== 'globe' && backgroundMode !== 'radar') ? "md:flex-row md:items-center justify-between" : "items-center"
                 )}>
                   <div className={cn(
                     "space-y-4",
-                    backgroundMode === 'globe' ? "text-center" : "text-left"
+                    backgroundMode === 'radar' ? "text-left md:space-y-1" :
+                    (backgroundMode === 'globe' || backgroundMode === 'radar') ? "text-center" : "text-left"
                   )}>
                     <div className={cn(
                       "flex items-center gap-3",
-                      backgroundMode === 'globe' ? "justify-center" : ""
+                      backgroundMode === 'radar' ? "justify-start" :
+                      (backgroundMode === 'globe' || backgroundMode === 'radar') ? "justify-center" : ""
                     )}>
                       <div className={cn(
                         "px-3 py-1 rounded-full transition-all duration-700",
+                        backgroundMode === 'radar' ? "bg-sky-400/10 border border-sky-400/20" :
                         backgroundMode === 'atmosphere'
                           ? "bg-sky-500/20 border border-sky-400/30"
                           : "bg-white/10 border border-white/10"
                       )}>
                         <span className={cn(
                           "text-[9px] font-black uppercase tracking-[0.2em] transition-all",
+                          backgroundMode === 'radar' ? "text-sky-400" :
                           backgroundMode === 'atmosphere' ? "text-sky-300" : "text-sky-400"
-                        )}>Atmospheric State</span>
+                        )}>
+                          {backgroundMode === 'radar' ? "Sector Scan Active" : "Atmospheric State"}
+                        </span>
                       </div>
+                      {backgroundMode === 'radar' && (
+                        <div className="hidden md:flex items-center gap-1.5 text-[10px] font-mono text-white/40">
+                          <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                          {weather.location.lat.toFixed(4)}°N / {weather.location.lon.toFixed(4)}°E
+                        </div>
+                      )}
                     </div>
                     
-                    <div className="space-y-2">
+                    <div className={cn("space-y-1", backgroundMode === 'radar' && "flex items-baseline gap-3")}>
                       <h1 className={cn(
                         "font-thin tracking-tighter text-white leading-[1.1] transition-all",
-                        backgroundMode === 'globe' ? "text-4xl sm:text-5xl" : "text-5xl sm:text-7xl"
+                        backgroundMode === 'radar' ? "text-2xl sm:text-3xl text-shadow-xl" :
+                        (backgroundMode === 'globe' || backgroundMode === 'radar') ? "text-4xl sm:text-5xl" : "text-5xl sm:text-7xl"
                       )}>
                         {weather.location.name}
                       </h1>
-                      <p className="text-[10px] font-black text-sky-400/60 tracking-[0.4em] uppercase">
-                        {weather.location.country}
-                      </p>
+                      <div className="flex items-center gap-3">
+                        <p className={cn(
+                          "text-[10px] font-black tracking-[0.4em] uppercase",
+                          backgroundMode === 'radar' ? "text-sky-400 text-shadow-md" : "text-sky-400/60"
+                        )}>
+                          {weather.location.country}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
                   <div className={cn(
-                    "flex items-center gap-8",
-                    backgroundMode === 'globe' ? "justify-center" : "sm:gap-12"
+                    "flex items-center gap-6",
+                    backgroundMode === 'radar' ? "space-x-8" :
+                    (backgroundMode === 'globe' || backgroundMode === 'radar') ? "justify-center" : "sm:gap-12"
                   )}>
-                    <div className="text-center">
+                    <div className={cn(
+                      "flex items-center gap-4",
+                      backgroundMode === 'radar' ? "text-left" : "text-center"
+                    )}>
                       <motion.div 
                         key={`${units.temperature}-${weather.current.temp}`}
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         className={cn(
                           "font-thin tracking-tighter text-white leading-none inline-flex items-start transition-all",
-                          backgroundMode === 'globe' ? "text-6xl sm:text-7xl" : "text-8xl sm:text-[10rem]"
+                          backgroundMode === 'radar' ? "text-4xl sm:text-5xl text-shadow-xl" :
+                          (backgroundMode === 'globe' || backgroundMode === 'radar') ? "text-6xl sm:text-7xl" : "text-8xl sm:text-[10rem]"
                         )}
                       >
                         {convertTemperature(weather.current.temp, units.temperature)}
                         <span className={cn(
                           "opacity-30 font-light",
-                          backgroundMode === 'globe' ? "text-2xl mt-1" : "text-4xl sm:text-6xl mt-6"
+                          backgroundMode === 'radar' ? "text-xl mt-0 shadow-none" :
+                          (backgroundMode === 'globe' || backgroundMode === 'radar') ? "text-2xl mt-1" : "text-4xl sm:text-6xl mt-6"
                         )}>°</span>
                       </motion.div>
-                      {backgroundMode === 'globe' && (
-                        <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em] mt-2">
-                          {weather.current.description}
-                        </p>
+                      {(backgroundMode === 'globe' || backgroundMode === 'radar') && (
+                        <div className="flex flex-col">
+                          <p className={cn(
+                            "text-[10px] font-bold uppercase tracking-[0.3em]",
+                            backgroundMode === 'radar' ? "text-white/90 text-shadow-md" : "text-white/40"
+                          )}>
+                            {weather.current.description}
+                          </p>
+                          {backgroundMode === 'radar' && (
+                            <span className="text-[8px] font-mono text-white/50 mt-1 uppercase tracking-widest text-shadow-sm">Live Telemetry</span>
+                          )}
+                        </div>
                       )}
                     </div>
                     
                     <div className={cn(
                       "rounded-full transition-all duration-500 hover:scale-105 active:scale-95 flex items-center justify-center shrink-0",
+                      backgroundMode === 'radar' ? "p-2.5 bg-black/20 border border-white/10 w-12 h-12 backdrop-blur-sm shadow-xl" : 
                       backgroundMode === 'atmosphere'
                         ? "p-8 sm:p-10 bg-white/5 border border-white/10"
                         : "p-4 bg-white/5 border border-white/10",
-                      backgroundMode === 'globe' ? "w-20 h-20" : "w-auto h-auto"
+                      (backgroundMode === 'globe' || backgroundMode === 'radar') ? (backgroundMode === 'radar' ? 'w-12 h-12' : "w-20 h-20") : "w-auto h-auto"
                     )}>
                       <WeatherIcon 
                         code={weather.current.conditionCode} 
                         isDay={weather.current.isDay} 
-                        size={backgroundMode === 'globe' ? 44 : 80} 
+                        size={backgroundMode === 'radar' ? 24 : (backgroundMode === 'globe' ? 44 : 80)} 
                       />
                     </div>
                   </div>
                 </div>
               </motion.div>
 
-              {/* Weather Analytics - Collapsed in Globe Mode */}
-              {backgroundMode !== 'globe' ? (
+              {/* Weather Analytics - Collapsed in Globe/Radar Mode */}
+              {(backgroundMode !== 'globe' && backgroundMode !== 'radar') ? (
                 <div className="grid gap-8 pb-12 flex-1 grid-cols-1 xl:grid-cols-4">
                   <div className="space-y-12 xl:col-span-3">
                     <section>
@@ -745,6 +825,7 @@ export default function App() {
                         units={units}
                         isAtmosphereMode={backgroundMode === 'atmosphere'}
                         hourly={weather.hourly}
+                        conditionCode={weather.current.conditionCode}
                       />
                     </section>
                     
@@ -783,7 +864,7 @@ export default function App() {
                 </div>
               ) : null}
 
-              {weather.alerts.length > 0 && backgroundMode !== 'globe' && (
+              {weather.alerts.length > 0 && (backgroundMode !== 'globe' && backgroundMode !== 'radar') && (
                 <section className="pt-8 pb-12">
                   <div className="flex items-center gap-4 mb-8">
                     <h2 className="text-[11px] font-black text-rose-500/50 uppercase tracking-[0.4em]">Security Alerts</h2>
@@ -793,7 +874,7 @@ export default function App() {
                 </section>
               )}
               
-              {backgroundMode !== 'globe' && (
+              {(backgroundMode !== 'globe' && backgroundMode !== 'radar') && (
                 <footer className="pt-24 pb-12 flex flex-col gap-6 shrink-0 items-center">
                   <div className="flex items-center justify-center gap-6">
                     {[

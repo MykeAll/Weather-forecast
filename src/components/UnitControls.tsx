@@ -28,11 +28,13 @@ export const UnitControls: React.FC<UnitControlsProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         style={{ borderColor: '#edebeb', borderWidth: '1.8px' }}
         className={cn(
-          "p-3 rounded-2xl transition-all text-white duration-700 cursor-pointer",
+          "p-3 rounded-2xl transition-all text-white duration-700 cursor-pointer shadow-md",
           isAtmosphereMode 
-            ? "bg-white/10 backdrop-blur-xl border border-white/20 hover:bg-white/20 shadow-lg" 
-            : "bg-transparent border-transparent hover:bg-white/5 shadow-none",
-          isOpen && "bg-white/20 border-white/40"
+            ? "bg-black/60 backdrop-blur-xl border border-white/20 hover:bg-black/70 shadow-lg shadow-black/20" 
+            : backgroundMode === 'radar'
+              ? "bg-black/60 backdrop-blur-md border border-white/20 shadow-black/40 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
+              : "bg-transparent border-transparent hover:bg-white/5 shadow-none",
+          isOpen && "bg-black/80 border-white/40"
         )}
       >
         <Settings2 size={24} />

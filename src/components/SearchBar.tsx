@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, Loader2, Mic, MicOff } from 'lucide-react';
+import { Search, MapPin, Loader2, Mic, MicOff, X } from 'lucide-react';
 import { searchLocations } from '../services/weatherService';
 import { SearchSuggestion } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -94,8 +94,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelect, onLocate, isAtmo
   return (
     <div ref={containerRef} className="relative w-full max-w-xl mx-auto z-50">
       <div className="relative group">
-        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-white/50 group-focus-within:text-white transition-colors">
-          <Search className="w-5 h-5" />
+        <div className={cn(
+          "absolute inset-y-0 left-4 flex items-center pointer-events-none text-white/50 group-focus-within:text-white transition-colors",
+          !isAtmosphereMode && "drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
+        )}>
+          <Search className="w-5 h-5 shadow-sm" />
         </div>
         <input
           type="text"
@@ -106,16 +109,28 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelect, onLocate, isAtmo
           className={cn(
             "w-full h-14 pl-10 sm:pl-12 pr-20 sm:pr-24 rounded-2xl text-white placeholder:text-white/40 placeholder:text-sm sm:placeholder:text-base focus:outline-none focus:ring-2 focus:ring-white/30 focus:bg-white/20 transition-all duration-700 cursor-text",
             isAtmosphereMode 
-              ? "bg-white/10 backdrop-blur-md border border-white/20 shadow-xl" 
-              : "bg-black/20 backdrop-blur-xl border border-white/10",
+              ? "bg-black/60 backdrop-blur-xl border border-white/20 shadow-lg shadow-black/20" 
+              : "bg-black/60 backdrop-blur-2xl border border-white/10 shadow-lg shadow-black/40",
             isListening && "ring-2 ring-sky-500 bg-white/20"
           )}
         />
-        <div className="absolute inset-y-0 right-4 flex items-center gap-2 sm:gap-3">
+        <div className={cn(
+          "absolute inset-y-0 right-4 flex items-center gap-1 sm:gap-2",
+          !isAtmosphereMode && "drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
+        )}>
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              className="flex items-center text-white/30 hover:text-white transition-colors cursor-pointer p-1.5 sm:p-2 rounded-lg hover:bg-white/5"
+              title="Clear search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={startVoiceSearch}
             className={cn(
-              "flex items-center transition-colors cursor-pointer p-2 rounded-lg hover:bg-white/5",
+              "flex items-center transition-colors cursor-pointer p-1.5 sm:p-2 rounded-lg hover:bg-white/5",
               isListening ? "text-sky-400" : "text-white/50 hover:text-white"
             )}
             title="Search by voice"
@@ -133,7 +148,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelect, onLocate, isAtmo
           </button>
           <button
             onClick={onLocate}
-            className="flex items-center text-white/50 hover:text-white transition-colors cursor-pointer p-2 rounded-lg hover:bg-white/5"
+            className="flex items-center text-white/50 hover:text-white transition-colors cursor-pointer p-1.5 sm:p-2 rounded-lg hover:bg-white/5"
             title="Use current location"
           >
             <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />

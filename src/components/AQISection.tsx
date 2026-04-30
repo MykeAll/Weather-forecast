@@ -47,13 +47,15 @@ export const AQISection: React.FC<AQISectionProps> = ({ data }) => {
   if (!data) return null;
 
   const pollutants = [
-    { label: 'PM2.5', value: data.pollutants.pm2_5, unit: 'µg/m³', desc: 'Fine particles', max: 50 },
-    { label: 'PM10', value: data.pollutants.pm10, unit: 'µg/m³', desc: 'Coarse particles', max: 100 },
-    { label: 'NO₂', value: data.pollutants.no2, unit: 'µg/m³', desc: 'Nitrogen dioxide', max: 100 },
-    { label: 'O₃', value: data.pollutants.o3, unit: 'µg/m³', desc: 'Ozone', max: 150 },
-    { label: 'SO₂', value: data.pollutants.so2, unit: 'µg/m³', desc: 'Sulfur dioxide', max: 100 },
-    { label: 'CO', value: data.pollutants.co, unit: 'µg/m³', desc: 'Carbon monoxide', max: 1000 },
+    { label: 'PM2.5', value: data.pollutants.pm2_5, unit: 'µg/m³', desc: 'Fine particles', max: 50, alertThreshold: 35 },
+    { label: 'PM10', value: data.pollutants.pm10, unit: 'µg/m³', desc: 'Coarse particles', max: 100, alertThreshold: 75 },
+    { label: 'NO₂', value: data.pollutants.no2, unit: 'µg/m³', desc: 'Nitrogen dioxide', max: 100, alertThreshold: 80 },
+    { label: 'O₃', value: data.pollutants.o3, unit: 'µg/m³', desc: 'Ozone', max: 150, alertThreshold: 120 },
+    { label: 'SO₂', value: data.pollutants.so2, unit: 'µg/m³', desc: 'Sulfur dioxide', max: 100, alertThreshold: 70 },
+    { label: 'CO', value: data.pollutants.co, unit: 'µg/m³', desc: 'Carbon monoxide', max: 1000, alertThreshold: 900 },
   ] as const;
+
+  const alerts = pollutants.filter(p => p.value > p.alertThreshold);
 
   const getPollutantColor = (value: number, max: number) => {
     const ratio = value / max;
@@ -94,7 +96,7 @@ export const AQISection: React.FC<AQISectionProps> = ({ data }) => {
         </div>
       </div>
 
-      <div className="relative h-1 w-full bg-white/5 rounded-full mb-12 overflow-hidden">
+      <div className="relative h-1 w-full bg-white/5 rounded-full mb-8 overflow-hidden">
         <motion.div 
           initial={{ width: 0 }}
           animate={{ width: `${getProgress(data.index)}%` }}
@@ -102,6 +104,38 @@ export const AQISection: React.FC<AQISectionProps> = ({ data }) => {
           className={cn("absolute h-full rounded-full", data.color.replace('text-', 'bg-'))}
         />
       </div>
+
+      <AnimatePresence>
+        {alerts.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            className="mb-8 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex flex-col gap-3"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+              <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Active Pollutant Alerts</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {alerts.map(a => (
+                <div key={a.label} className="bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/20 flex flex-col gap-1 p-3 min-w-[140px]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-rose-200">{a.label} High</span>
+                    <span className="text-[10px] font-mono text-rose-400/60">{Math.round(a.value)} {a.unit}</span>
+                  </div>
+                  <p className="text-[9px] text-rose-300/40 leading-tight">
+                    {pollutantDetails[a.label as keyof typeof pollutantDetails]?.health.split('.')[0]}.
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-rose-200/50 leading-relaxed font-medium mt-1 px-1">
+              Concentrations exceeding safety limits. Immediate health effects may include respiratory irritation and increased risk for sensitive individuals.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {pollutants.map((p, i) => (

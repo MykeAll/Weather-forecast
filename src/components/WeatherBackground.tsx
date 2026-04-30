@@ -4,7 +4,7 @@ import { cn } from '../lib/utils';
 import Globe from 'react-globe.gl';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { Cloud, Globe as GlobeIcon } from 'lucide-react';
+import { Cloud, Globe as GlobeIcon, LocateFixed, Maximize2 } from 'lucide-react';
 
 // Fix Leaflet icon issue
 // @ts-ignore
@@ -24,7 +24,103 @@ interface WeatherBackgroundProps {
   longitude?: number;
   mode?: WeatherBackgroundMode;
   intensity?: number; // 0 to 1
+  windSpeed?: number;
+  temperature?: number;
 }
+
+// --- Heat Haze Component ---
+const HeatHaze: React.FC<{ intensity: number }> = ({ intensity }) => {
+  return (
+    <div className="absolute inset-0 z-10 pointer-events-none opacity-40">
+      <svg className="hidden">
+        <filter id="heatHaze">
+          <feTurbulence type="fractalNoise" baseFrequency="0.01 0.05" numOctaves="2" seed="1">
+            <animate attributeName="baseFrequency" dur="10s" values="0.01 0.05; 0.01 0.1; 0.01 0.05" repeatCount="indefinite" />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" scale={15 * intensity} />
+        </filter>
+      </svg>
+      <div 
+        className="w-full h-full bg-white/5" 
+        style={{ filter: 'url(#heatHaze)' }} 
+      />
+    </div>
+  );
+};
+
+// --- Wind Driven Clouds Component ---
+const WindDrivenClouds: React.FC<{ windSpeed: number }> = ({ windSpeed }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let clouds: { x: number; y: number; scale: number; speed: number; opacity: number; size: number }[] = [];
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      initClouds();
+    };
+
+    const initClouds = () => {
+      clouds = [];
+      const count = 15;
+      for (let i = 0; i < count; i++) {
+        clouds.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * (canvas.height * 0.6),
+          scale: 1 + Math.random() * 2,
+          speed: (windSpeed / 10 + Math.random() * 0.5) * 0.5,
+          opacity: 0.05 + Math.random() * 0.1,
+          size: 150 + Math.random() * 200
+        });
+      }
+    };
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      clouds.forEach(c => {
+        ctx.save();
+        ctx.translate(c.x, c.y);
+        ctx.scale(c.scale, 1);
+        
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, c.size);
+        gradient.addColorStop(0, `rgba(255, 255, 255, ${c.opacity})`);
+        gradient.addColorStop(0.6, `rgba(255, 255, 255, ${c.opacity * 0.5})`);
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, c.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        c.x += c.speed;
+        if (c.x > canvas.width + c.size * 2) {
+          c.x = -c.size * 2;
+          c.y = Math.random() * (canvas.height * 0.6);
+        }
+      });
+      animationFrameId = requestAnimationFrame(draw);
+    };
+
+    window.addEventListener('resize', resize);
+    resize();
+    draw();
+
+    return () => {
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [windSpeed]);
+
+  return <canvas ref={canvasRef} className="absolute inset-0 z-0 pointer-events-none mix-blend-screen" />;
+};
 
 const atmosphereStyles: Record<string, string> = {
   clear: "from-sky-400 via-blue-500 to-sky-600",
@@ -111,18 +207,18 @@ const StarField: React.FC = () => {
         star.x += star.drift;
         if (star.x > canvas.width) star.x = 0;
 
-        ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, star.alpha)})`;
+        const currentAlpha = Math.max(0, star.alpha);
+        ctx.fillStyle = `rgba(255, 255, 255, ${currentAlpha})`;
         ctx.beginPath();
         ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
         ctx.fill();
         
-        if (star.size > 1) {
-          ctx.shadowBlur = 4;
-          ctx.shadowColor = 'white';
+        // Efficient Glow (avoid shadowBlur)
+        if (star.size > 1.2 && currentAlpha > 0.5) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${currentAlpha * 0.3})`;
           ctx.beginPath();
-          ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+          ctx.arc(star.x, star.y, star.size * 2, 0, Math.PI * 2);
           ctx.fill();
-          ctx.shadowBlur = 0;
         }
       });
       animationFrameId = requestAnimationFrame(draw);
@@ -153,9 +249,9 @@ const RainEffect: React.FC<{ intensity: number }> = ({ intensity }) => {
 
     let animationFrameId: number;
     let drops: { x: number; y: number; length: number; speed: number; opacity: number }[] = [];
-    let splashes: { x: number; y: number; r: number; rMax: number; alpha: number }[] = [];
+    let splashes: { x: number; y: number; r: number; rMax: number; alpha: number; particles: { vx: number; vy: number; px: number; py: number }[] }[] = [];
 
-    const dropCount = Math.floor(intensity * 100);
+    const dropCount = Math.min(Math.floor(intensity * 120), 150);
 
     const initDrops = () => {
       drops = [];
@@ -190,14 +286,26 @@ const RainEffect: React.FC<{ intensity: number }> = ({ intensity }) => {
 
         drop.y += drop.speed;
         if (drop.y > canvas.height - 20) {
-          // Create splash
-          if (Math.random() < 0.6) { // Increased frequency
+          // Create splash with impact particles
+          if (Math.random() < 0.7) { 
+            const particleCount = 3 + Math.floor(Math.random() * 4);
+            const splashParticles = [];
+            for (let p = 0; p < particleCount; p++) {
+              splashParticles.push({
+                vx: (Math.random() - 0.5) * 4,
+                vy: -Math.random() * 3 - 2,
+                px: 0,
+                py: 0
+              });
+            }
+
             splashes.push({
               x: drop.x,
               y: canvas.height - 10 + Math.random() * 10,
               r: 0.5,
-              rMax: Math.random() * 15 + 8, // Larger splashes
-              alpha: 0.7 // Higher initial visibility
+              rMax: Math.random() * 20 + 10,
+              alpha: 0.8,
+              particles: splashParticles
             });
           }
           drop.y = -drop.length;
@@ -206,16 +314,30 @@ const RainEffect: React.FC<{ intensity: number }> = ({ intensity }) => {
       });
 
       // Draw Splashes
-      ctx.lineWidth = 0.5;
       for (let i = splashes.length - 1; i >= 0; i--) {
         const s = splashes[i];
-        ctx.strokeStyle = `rgba(255, 255, 255, ${s.alpha * intensity})`;
-        ctx.beginPath();
-        ctx.ellipse(s.x, s.y, s.r, s.r * 0.3, 0, 0, Math.PI * 2);
-        ctx.stroke();
         
-        s.r += 0.5;
-        s.alpha -= 0.02;
+        // Ripple effect
+        ctx.lineWidth = 0.8;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${s.alpha * intensity * 0.5})`;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, s.r, s.r * 0.25, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Impact particles
+        ctx.fillStyle = `rgba(200, 220, 255, ${s.alpha * intensity})`;
+        s.particles.forEach(p => {
+          ctx.beginPath();
+          ctx.arc(s.x + p.px, s.y + p.py, 1, 0, Math.PI * 2);
+          ctx.fill();
+          
+          p.px += p.vx;
+          p.py += p.vy;
+          p.vy += 0.2; // Gravity
+        });
+        
+        s.r += 0.8;
+        s.alpha -= 0.025;
         if (s.alpha <= 0 || s.r >= s.rMax) {
           splashes.splice(i, 1);
         }
@@ -248,9 +370,19 @@ const SnowEffect: React.FC<{ intensity: number }> = ({ intensity }) => {
     if (!ctx) return;
 
     let animationFrameId: number;
-    let flakes: { x: number; y: number; r: number; d: number; speed: number; shimmer: number; shimmerSpeed: number }[] = [];
+    let flakes: { 
+      x: number; 
+      y: number; 
+      r: number; 
+      d: number; 
+      speed: number; 
+      shimmer: number; 
+      shimmerSpeed: number;
+      swing: number;
+      swingSpeed: number;
+    }[] = [];
 
-    const flakeCount = Math.floor(intensity * 80);
+    const flakeCount = Math.floor(intensity * 150);
 
     const initFlakes = () => {
       flakes = [];
@@ -258,11 +390,13 @@ const SnowEffect: React.FC<{ intensity: number }> = ({ intensity }) => {
         flakes.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height,
-          r: Math.random() * 3 + 1, // radius
-          d: Math.random() * flakeCount, // density
-          speed: Math.random() * 0.8 + 0.5,
-          shimmer: Math.random(),
-          shimmerSpeed: Math.random() * 0.02 + 0.01
+          r: Math.random() * 2.5 + 0.5, // Variance in size
+          d: Math.random() * flakeCount,
+          speed: Math.random() * 1.5 + 0.5,
+          shimmer: Math.random() * Math.PI,
+          shimmerSpeed: Math.random() * 0.03 + 0.01,
+          swing: Math.random() * Math.PI * 2,
+          swingSpeed: Math.random() * 0.02 + 0.01
         });
       }
     };
@@ -275,26 +409,44 @@ const SnowEffect: React.FC<{ intensity: number }> = ({ intensity }) => {
 
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-      ctx.beginPath();
-
+      
       flakes.forEach((f) => {
         f.shimmer += f.shimmerSpeed;
-        const opacity = 0.4 + Math.abs(Math.sin(f.shimmer)) * 0.4;
+        f.swing += f.swingSpeed;
         
-        ctx.fillStyle = `rgba(255, 255, 255, ${opacity * intensity})`;
-        ctx.moveTo(f.x, f.y);
+        const opacity = (0.3 + Math.abs(Math.sin(f.shimmer)) * 0.5) * intensity;
+        const drift = Math.sin(f.swing) * 1.5;
+        
+        ctx.save();
+        ctx.translate(f.x + drift, f.y);
+        
+        // Draw flake with a subtle glow
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, f.r * 2);
+        gradient.addColorStop(0, `rgba(255, 255, 255, ${opacity})`);
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2, true);
+        ctx.arc(0, 0, f.r * 2, 0, Math.PI * 2);
         ctx.fill();
+        
+        // Solid core
+        ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.8})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, f.r, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
 
-        f.y += Math.cos(f.d) + 1 + f.r / 2;
-        f.x += Math.sin(f.d) * 2;
+        f.y += f.speed;
+        f.x += Math.sin(f.d) * 0.5;
 
-        if (f.x > canvas.width + 5 || f.x < -5 || f.y > canvas.height) {
-          f.x = Math.random() * canvas.width;
+        if (f.y > canvas.height + 10) {
           f.y = -10;
+          f.x = Math.random() * canvas.width;
         }
+        if (f.x > canvas.width + 10) f.x = -10;
+        if (f.x < -10) f.x = canvas.width + 10;
       });
       
       animationFrameId = requestAnimationFrame(draw);
@@ -349,50 +501,62 @@ const LightningBolt: React.FC<{ onComplete: () => void }> = ({ onComplete }) => 
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const startX = Math.random() * canvas.width;
-    const startY = 0;
-    
-    // Generate segments
-    const segments: { x: number; y: number }[] = [{ x: startX, y: startY }];
-    let curX = startX;
-    let curY = startY;
-    const iterations = 15 + Math.random() * 15;
-    const step = canvas.height / iterations;
-
-    for (let i = 0; i < iterations; i++) {
-      curX += (Math.random() - 0.5) * 150;
-      curY += step;
-      segments.push({ x: curX, y: curY });
+    const createBolt = (x: number, y: number, angle: number, length: number, thickness: number, depth: number): { x: number; y: number }[] => {
+      const branches: { x: number; y: number }[] = [{ x, y }];
+      let curX = x;
+      let curY = y;
       
-      // Random branch
-      if (Math.random() < 0.2) {
-        let bX = curX;
-        let bY = curY;
-        const bLen = 5 + Math.random() * 10;
-        for (let j = 0; j < bLen; j++) {
-           bX += (Math.random() - 0.5) * 100;
-           bY += step * 0.7;
-           // We'll draw these inline
+      const segments = 10 + Math.random() * 10;
+      const step = length / segments;
+
+      for (let i = 0; i < segments; i++) {
+        const nextAngle = angle + (Math.random() - 0.5) * 0.8;
+        curX += Math.cos(nextAngle) * step;
+        curY += Math.sin(nextAngle) * step;
+        branches.push({ x: curX, y: curY });
+
+        // Recursive branching
+        if (depth < 3 && Math.random() < 0.15) {
+          const branchAngle = nextAngle + (Math.random() < 0.5 ? 1 : -1) * 0.6;
+          const branchSegments = createBolt(curX, curY, branchAngle, length * 0.6, thickness * 0.6, depth + 1);
+          allSegments.push({ path: branchSegments, thickness: thickness * 0.6 });
         }
       }
-    }
+      return branches;
+    };
+
+    const allSegments: { path: { x: number; y: number }[]; thickness: number }[] = [];
+    const mainPath = createBolt(Math.random() * canvas.width, 0, Math.PI / 2, canvas.height, 3, 0);
+    allSegments.push({ path: mainPath, thickness: 3 });
 
     let alpha = 1;
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = `rgba(200, 220, 255, ${alpha})`;
-      ctx.lineWidth = 2 + Math.random() * 2;
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = 'rgba(150, 180, 255, 1)';
       
-      ctx.beginPath();
-      ctx.moveTo(segments[0].x, segments[0].y);
-      for (let i = 1; i < segments.length; i++) {
-        ctx.lineTo(segments[i].x, segments[i].y);
-      }
-      ctx.stroke();
+      allSegments.forEach(({ path, thickness }) => {
+        ctx.strokeStyle = `rgba(180, 210, 255, ${alpha})`;
+        ctx.lineWidth = thickness * (Math.random() * 0.5 + 0.8);
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        
+        ctx.shadowBlur = 20 * alpha;
+        ctx.shadowColor = 'rgba(100, 150, 255, 1)';
+        
+        ctx.beginPath();
+        ctx.moveTo(path[0].x, path[0].y);
+        for (let i = 1; i < path.length; i++) {
+          ctx.lineTo(path[i].x, path[i].y);
+        }
+        ctx.stroke();
 
-      alpha -= 0.08;
+        // Secondary inner glow
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.lineWidth = thickness * 0.5;
+        ctx.shadowBlur = 5;
+        ctx.stroke();
+      });
+
+      alpha -= 0.05;
       if (alpha > 0) {
         requestAnimationFrame(animate);
       } else {
@@ -464,22 +628,32 @@ const Lightning: React.FC = () => {
 const RadarMap: React.FC<{ lat: number, lon: number }> = ({ lat, lon }) => {
   const [layer, setLayer] = useState<'precipitation_new' | 'temp_new' | 'wind_new'>('precipitation_new');
   const [opacity, setOpacity] = useState(0.8);
+  const [zoomLevel, setZoomLevel] = useState(7);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
-  // Manually update opacity if prop doesn't sync perfectly
+  // Manually update opacity
   useEffect(() => {
     if (tileLayerRef.current) {
       tileLayerRef.current.setOpacity(opacity);
     }
   }, [opacity]);
 
-  const MapUpdater = () => {
+  const MapEvents = () => {
     const map = useMap();
     useEffect(() => {
       mapRef.current = map;
-      map.setView([lat, lon], 7);
+      map.setView([lat, lon], zoomLevel);
     }, [map, lat, lon]);
+
+    useEffect(() => {
+      const onZoom = () => setZoomLevel(map.getZoom());
+      map.on('zoomend', onZoom);
+      return () => {
+        map.off('zoomend', onZoom);
+      };
+    }, [map]);
+
     return null;
   };
 
@@ -495,12 +669,21 @@ const RadarMap: React.FC<{ lat: number, lon: number }> = ({ lat, lon }) => {
         center={[lat, lon]} 
         zoom={7} 
         scrollWheelZoom={true}
-        style={{ height: '100%', width: '100%', filter: 'grayscale(0.6) invert(0.9) contrast(1.2) brightness(0.8)' }}
+        style={{ height: '100%', width: '100%', filter: 'grayscale(0.4) brightness(0.9) contrast(1.1)' }}
         zoomControl={false}
+        zoomAnimation={true}
+        fadeAnimation={true}
+        markerZoomAnimation={true}
+        preferCanvas={true}
+        bounceAtZoomLimits={false}
+        updateWhenIdle={true}
+        updateWhenZooming={false}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; OpenStreetMap'
+          updateInterval={100}
+          keepBuffer={4}
         />
         <TileLayer
           eventHandlers={{
@@ -511,49 +694,88 @@ const RadarMap: React.FC<{ lat: number, lon: number }> = ({ lat, lon }) => {
           key={layer}
           url={`https://tile.openweathermap.org/map/${layer}/{z}/{x}/{y}.png?appid=86940733a1e27a922119777174ba1340`}
           opacity={opacity}
+          zIndex={10}
         />
-        <MapUpdater />
+        <MapEvents />
       </MapContainer>
 
-      {/* Radar Controls */}
-      <div className="absolute top-40 left-6 z-40 flex flex-col gap-3 pointer-events-auto">
-        <div className="bg-black/60 backdrop-blur-xl border border-white/10 p-2 rounded-2xl flex flex-col gap-1">
+      {/* Radar Controls - LEFT SIDE (Zoom) */}
+      <div className="fixed top-48 left-6 z-[80] flex flex-col gap-3 pointer-events-auto items-center">
+        <div className="bg-black/80 backdrop-blur-3xl border border-white/20 p-2 rounded-2xl flex flex-col gap-1 shadow-2xl">
+          <button
+            onClick={() => mapRef.current?.zoomIn()}
+            className="w-10 h-10 rounded-xl transition-all flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 active:scale-95"
+            title="Zoom In"
+          >
+            <div className="text-xl font-bold">+</div>
+          </button>
+          <div className="h-px bg-white/10 mx-2" />
+          <button
+            onClick={() => mapRef.current?.setZoom(7)}
+            className="w-10 h-10 rounded-xl transition-all flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 active:scale-95"
+            title="Reset Zoom Level"
+          >
+            <Maximize2 size={16} />
+          </button>
+          <div className="h-px bg-white/10 mx-2" />
+          <button
+            onClick={() => mapRef.current?.zoomOut()}
+            className="w-10 h-10 rounded-xl transition-all flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 active:scale-95"
+            title="Zoom Out"
+          >
+            <div className="text-xl font-bold">−</div>
+          </button>
+        </div>
+
+        <button
+          onClick={() => mapRef.current?.setView([lat, lon], 7)}
+          className="bg-black/80 backdrop-blur-3xl border border-white/20 w-12 h-12 rounded-2xl text-white/60 hover:text-white hover:bg-white/5 transition-all flex items-center justify-center shadow-2xl group active:scale-95"
+          title="Recenter to Location"
+        >
+          <LocateFixed size={20} className="transition-transform group-hover:scale-110" />
+        </button>
+      </div>
+
+      {/* Radar Controls - RIGHT SIDE (Layers/Opacity) */}
+      <div className="fixed top-48 right-6 z-[80] flex flex-col gap-3 pointer-events-auto items-center">
+        <div className="bg-black/80 backdrop-blur-3xl border border-white/20 p-2 rounded-2xl flex flex-col gap-1 shadow-2xl">
           {layers.map((l) => (
             <button
               key={l.id}
               onClick={() => setLayer(l.id as any)}
               className={cn(
-                "p-3 rounded-xl transition-all flex items-center justify-center gap-2",
-                layer === l.id ? "bg-white text-black shadow-lg" : "text-white/40 hover:text-white hover:bg-white/5"
+                "p-3 rounded-xl transition-all flex items-center justify-center gap-2 group relative",
+                layer === l.id ? "bg-sky-500 text-white shadow-[0_0_15px_rgba(14,165,233,0.4)]" : "text-white/60 hover:text-white hover:bg-white/10"
               )}
               title={l.label}
             >
               {l.icon}
               <span className="text-[10px] font-bold uppercase tracking-wider hidden lg:block">{l.label}</span>
+              {layer === l.id && (
+                <motion.div 
+                  layoutId="activeLayer"
+                  className="absolute -right-1 top-1 w-2 h-2 bg-white rounded-full border-2 border-sky-500"
+                />
+              )}
             </button>
           ))}
         </div>
 
-        <div className="bg-black/60 backdrop-blur-xl border border-white/10 p-3 rounded-2xl flex flex-col gap-2">
-          <span className="text-[8px] uppercase tracking-widest font-black text-white/30 text-center">Opacity</span>
+        <div className="bg-black/80 backdrop-blur-3xl border border-white/20 p-3 rounded-2xl flex flex-col gap-2 shadow-2xl">
+          <div className="flex justify-between items-center px-1">
+            <span className="text-[8px] uppercase tracking-widest font-black text-white/40">Opacity</span>
+            <span className="text-[9px] font-mono text-sky-400">{Math.round(opacity * 100)}%</span>
+          </div>
           <input 
             type="range" 
-            min="0" 
+            min="0.1" 
             max="1" 
-            step="0.1" 
+            step="0.05" 
             value={opacity} 
             onChange={(e) => setOpacity(parseFloat(e.target.value))}
-            className="w-24 accent-white cursor-pointer"
+            className="w-28 accent-sky-500 cursor-pointer h-1.5 bg-white/10 rounded-full appearance-none"
           />
         </div>
-
-        <button
-          onClick={() => mapRef.current?.setView([lat, lon], 7)}
-          className="bg-black/60 backdrop-blur-xl border border-white/10 p-3 rounded-2xl text-white/40 hover:text-white transition-all flex items-center justify-center"
-          title="Re-center"
-        >
-          <div className="p-0.5 border-2 border-current rounded-full" />
-        </button>
       </div>
 
       <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none z-10" />
@@ -598,7 +820,7 @@ const WeatherGlobe: React.FC<{ lat: number, lon: number }> = ({ lat, lon }) => {
   };
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black overflow-hidden pointer-events-auto">
+    <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-auto [filter:grayscale(0.5)_brightness(0.9)_contrast(1.1)]">
       <Globe
         ref={globeRef}
         globeImageUrl="//unpkg.com/three-globe/example/img/earth-night.jpg"
@@ -633,7 +855,7 @@ const WeatherGlobe: React.FC<{ lat: number, lon: number }> = ({ lat, lon }) => {
         }}
       />
 
-      <div className="absolute bottom-10 left-10 z-40 bg-black/40 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/10 pointer-events-auto">
+      <div className="absolute bottom-10 left-10 z-40 px-6 py-4 rounded-3xl pointer-events-auto">
         <div className="flex items-center gap-4">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
@@ -715,16 +937,19 @@ const DustMotes: React.FC = () => {
         if (mote.y > canvas.height) mote.y = 0;
         if (mote.y < 0) mote.y = canvas.height;
 
-        ctx.fillStyle = `rgba(255, 255, 255, ${mote.alpha})`;
+        const currentAlpha = Math.max(0, mote.alpha);
+        ctx.fillStyle = `rgba(255, 255, 255, ${currentAlpha})`;
         ctx.beginPath();
         ctx.arc(mote.x, mote.y, mote.size, 0, Math.PI * 2);
         ctx.fill();
         
-        // Add a very subtle glow to the motes
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = 'rgba(255,255,255,0.2)';
-        ctx.stroke();
-        ctx.shadowBlur = 0;
+        // Efficient Glow
+        if (mote.size > 2) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${currentAlpha * 0.2})`;
+          ctx.beginPath();
+          ctx.arc(mote.x, mote.y, mote.size * 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
       });
       animationFrameId = requestAnimationFrame(draw);
     };
@@ -748,7 +973,9 @@ export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
   latitude = 0, 
   longitude = 0, 
   mode = 'atmosphere',
-  intensity = 0.5 
+  intensity = 0.5,
+  windSpeed = 5,
+  temperature = 20
 }) => {
   const key = isDay ? atmosphere : `${atmosphere}Night`;
   const gradientClass = atmosphereStyles[key] || atmosphereStyles[isDay ? 'clear' : 'clearNight'];
@@ -765,7 +992,7 @@ export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-0 pointer-events-none will-change-[opacity]"
           >
             <AnimatePresence mode="wait">
               <motion.div
@@ -783,6 +1010,9 @@ export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
 
             {/* Night Stars */}
             {!isDay && <StarField />}
+
+            {/* Heat Haze for Hot Conditions */}
+            {isDay && temperature > 30 && <HeatHaze intensity={(temperature - 30) / 10} />}
 
             {/* Sunny Day Light Rays & Glare */}
             {isDay && atmosphere === 'clear' && (
@@ -812,6 +1042,11 @@ export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
                 ))}
                 <div className="absolute top-[10%] left-[10%] w-[600px] h-[600px] bg-white/5 blur-[120px] rounded-full animate-pulse" />
               </div>
+            )}
+
+            {/* Wind Driven Clouds (Detailed Layer) */}
+            {(atmosphere === 'cloudy' || atmosphere === 'fog' || atmosphere === 'rain') && (
+              <WindDrivenClouds windSpeed={windSpeed} />
             )}
 
             {/* Enhanced Clouds Layer with Parallax */}

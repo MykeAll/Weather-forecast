@@ -76,6 +76,7 @@ export interface HourlyForecast {
   feelsLike: number;
   conditionCode: number;
   precipitation: number;
+  precipitationProbability: number;
   cloudCover: number;
   uvIndex: number;
   isDay: boolean;

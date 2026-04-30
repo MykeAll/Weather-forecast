@@ -154,26 +154,36 @@ const CelestialPhase: React.FC<{ sunrise: string; sunset: string; delay?: number
 };
 
 const WindCompass: React.FC<{ direction: number }> = ({ direction }) => (
-  <div className="relative flex items-center justify-center shrink-0 w-8 h-8 sm:w-10 sm:h-10">
-    {/* Compass Ring */}
-    <div className="absolute inset-0 rounded-full border border-white/10 bg-white/5" />
+  <div className="relative flex items-center justify-center shrink-0 w-8 h-8 sm:w-12 sm:h-12 group/compass">
+    {/* Compass Ring with Degrees */}
+    <div className="absolute inset-0 rounded-full border border-white/10 bg-white/5 transition-all duration-700 group-hover/compass:border-sky-500/30 group-hover/compass:bg-sky-500/10" />
     
-    {/* Cardinal Marks */}
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <span className="absolute top-0 text-[5px] sm:text-[7px] font-black text-white/30 leading-none -translate-y-0.5">N</span>
-      <span className="absolute right-0 text-[5px] sm:text-[7px] font-black text-white/30 leading-none translate-x-0.5">E</span>
-      <span className="absolute bottom-0 text-[5px] sm:text-[7px] font-black text-white/30 leading-none translate-y-0.5">S</span>
-      <span className="absolute left-0 text-[5px] sm:text-[7px] font-black text-white/30 leading-none -translate-x-0.5">W</span>
+    {/* Wind Rose Pattern */}
+    <div className="absolute inset-0 flex items-center justify-center opacity-10">
+      {[0, 45, 90, 135].map(deg => (
+        <div key={deg} className="absolute w-full h-[0.5px] bg-white" style={{ transform: `rotate(${deg}deg)` }} />
+      ))}
     </div>
 
-    {/* Needle Wrapper */}
+    {/* Cardinal Marks */}
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-1">
+      <span className="absolute top-0 text-[5px] sm:text-[8px] font-black text-white/40 leading-none">N</span>
+      <span className="absolute right-0 text-[5px] sm:text-[8px] font-black text-white/40 leading-none">E</span>
+      <span className="absolute bottom-0 text-[5px] sm:text-[8px] font-black text-white/40 leading-none">S</span>
+      <span className="absolute left-0 text-[5px] sm:text-[8px] font-black text-white/40 leading-none">W</span>
+    </div>
+
+    {/* Enhanced Directional Needle */}
     <motion.div
       animate={{ rotate: direction }}
-      transition={{ type: "spring", stiffness: 40, damping: 12 }}
-      className="relative z-10 flex items-center justify-center"
+      transition={{ type: "spring", stiffness: 60, damping: 15 }}
+      className="relative z-10 flex flex-col items-center justify-center"
     >
-      <div className="w-1 h-3 sm:w-1.5 sm:h-4 bg-sky-400 rounded-full relative">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 sm:w-2.5 sm:h-2.5 border-t-2 border-l-2 border-sky-400 rotate-45 -translate-y-0.5" />
+      <div className="w-1 h-4 sm:w-1.5 sm:h-6 bg-gradient-to-b from-sky-400 to-sky-600 rounded-full relative shadow-[0_0_10px_rgba(56,189,248,0.3)]">
+        {/* Arrow head */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[3px] border-r-[3px] border-b-[5px] border-l-transparent border-r-transparent border-b-sky-400 -translate-y-1" />
+        {/* Tail */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 sm:w-2 h-[2px] bg-sky-200/40 rounded-full blur-[1px]" />
       </div>
     </motion.div>
   </div>
@@ -248,6 +258,7 @@ interface WeatherMetricsProps {
   units: UnitSettings;
   isAtmosphereMode?: boolean;
   hourly?: any[]; // For UV trend
+  conditionCode?: number;
 }
 
 const UVTrendChart: React.FC<{ data: any[] }> = ({ data }) => {
@@ -316,7 +327,8 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
   sunset,
   units,
   isAtmosphereMode = true,
-  hourly = []
+  hourly = [],
+  conditionCode = 0
 }) => {
   const [showUVInfo, setShowUVInfo] = useState(false);
   
@@ -324,6 +336,10 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
   const displayFeelsLike = convertTemperature(feelsLike, units.temperature);
   const windUnit = units.windSpeed === 'kmh' ? 'km/h' : 'mph';
   const tempUnit = units.temperature === 'celsius' ? 'C' : 'F';
+
+  const precipitationProbability = hourly.length > 0 ? hourly[0].precipitationProbability : 0;
+
+  const isSnowing = [56, 57, 66, 67, 71, 73, 75, 77, 85, 86].includes(conditionCode);
 
   const formatTime = (timeStr: string) => {
     try {
@@ -434,6 +450,14 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
           isAtmosphereMode={isAtmosphereMode}
         />
         <Metric 
+          label="Prob. of Precip." 
+          value={precipitationProbability} 
+          unit="%" 
+          icon={<Droplets size={18} className="text-sky-400" />} 
+          delay={0.25}
+          isAtmosphereMode={isAtmosphereMode}
+        />
+        <Metric 
           label="Cloud Cover" 
           value={cloudCover} 
           unit="%" 
@@ -472,6 +496,90 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
           isAtmosphereMode={isAtmosphereMode}
         />
       </div>
+
+      <AnimatePresence>
+    {isSnowing && (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0 }}
+        className="p-6 rounded-[32px] bg-white/5 border border-white/10 flex flex-col items-center justify-center relative overflow-hidden group min-h-[160px]"
+      >
+        {/* Animated Flakes decoration - Dynamic based on precipitation */}
+        <div className="absolute inset-0 pointer-events-none opacity-30">
+          {[...Array(Math.min(15, Math.max(6, Math.floor(precipitation * 4))))].map((_, i) => (
+            <motion.div
+              key={i}
+              animate={{ 
+                y: ['-10%', '110%'],
+                x: [`${Math.sin(i * 1.5) * 40}%`, `${Math.cos(i * 1.2) * 40}%`],
+                rotate: 360,
+                scale: [1, 1.2, 0.8]
+              }}
+              transition={{ 
+                duration: 2 + (i % 3) + (1 / Math.max(0.1, precipitation)), 
+                repeat: Infinity, 
+                ease: "linear",
+                delay: i * -0.8
+              }}
+              className="absolute"
+              style={{ 
+                left: `${(i * 7) % 90}%`, 
+                top: '-10%',
+              }}
+            >
+              <div 
+                className="bg-white rounded-full blur-[1px]" 
+                style={{ 
+                  width: `${2 + (i % 4)}px`, 
+                  height: `${2 + (i % 4)}px`,
+                  opacity: 0.5 + (Math.random() * 0.5) 
+                }} 
+              />
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center text-center">
+          <span className="text-[10px] font-black text-sky-400/60 uppercase tracking-[0.4em] mb-4">Cryosphere Activity</span>
+          <div className="flex items-center gap-6">
+            <div className="space-y-1">
+              <span className="block text-3xl font-light text-white leading-none">
+                {precipitation > 2 || conditionCode >= 75 || conditionCode === 86 ? 'Heavy' : 
+                 precipitation > 0.5 || conditionCode >= 73 ? 'Moderate' : 'Light'}
+              </span>
+              <span className="block text-[8px] font-black text-white/20 uppercase tracking-widest">Snow Intensity</span>
+            </div>
+            <div className="w-px h-12 bg-white/10" />
+            <div className="flex gap-1.5 items-end h-8">
+              {[1, 2, 3, 4, 5].map((bar) => {
+                const intensityLevel = precipitation > 2.5 ? 5 : precipitation > 1.5 ? 4 : precipitation > 0.5 ? 3 : 2;
+                const isActive = bar <= intensityLevel;
+                return (
+                  <motion.div
+                    key={bar}
+                    initial={false}
+                    animate={{ 
+                      height: isActive ? `${20 + bar * 15}%` : '15%',
+                      opacity: isActive ? 1 : 0.1,
+                      backgroundColor: isActive ? '#38bdf8' : '#fff'
+                    }}
+                    className="w-1.5 rounded-full shadow-[0_0_10px_rgba(56,189,248,0.2)]"
+                  />
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-4">
+            <span className="text-[9px] font-black text-white/20 uppercase tracking-widest px-2 py-0.5 rounded-full border border-white/5">
+              {precipitation} mm/h
+            </span>
+            <p className="text-[10px] text-white/40 font-medium tracking-wide">Surface accumulation active</p>
+          </div>
+        </div>
+      </motion.div>
+    )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showUVInfo && (
