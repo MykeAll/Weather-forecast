@@ -26,6 +26,7 @@ export const UnitControls: React.FC<UnitControlsProps> = ({
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
+        style={{ borderColor: '#edebeb', borderWidth: '1.8px' }}
         className={cn(
           "p-3 rounded-2xl transition-all text-white duration-700 cursor-pointer",
           isAtmosphereMode 

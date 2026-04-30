@@ -73,9 +73,11 @@ export interface AQIData {
 export interface HourlyForecast {
   time: string;
   temp: number;
+  feelsLike: number;
   conditionCode: number;
   precipitation: number;
   cloudCover: number;
+  uvIndex: number;
   isDay: boolean;
 }
 
@@ -83,6 +85,8 @@ export interface DailyForecast {
   date: string;
   maxTemp: number;
   minTemp: number;
+  maxfeelsLike: number;
+  minfeelsLike: number;
   conditionCode: number;
   precipitationSum: number;
 }

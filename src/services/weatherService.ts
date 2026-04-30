@@ -161,98 +161,126 @@ export async function searchLocations(query: string): Promise<SearchSuggestion[]
 }
 
 export async function getWeatherData(lat: number, lon: number, locationName: string, country: string): Promise<WeatherData> {
-  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,uv_index,visibility,surface_pressure,cloud_cover,precipitation&hourly=temperature_2m,weather_code,is_day,precipitation,cloud_cover&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum&timezone=auto&forecast_days=7`;
+  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,uv_index,visibility,surface_pressure,cloud_cover,precipitation&hourly=temperature_2m,apparent_temperature,weather_code,is_day,precipitation,cloud_cover,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,precipitation_sum&timezone=auto&forecast_days=7`;
   const pollenUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen,european_aqi,pm10,pm2_5,nitrogen_dioxide,sulphur_dioxide,ozone,carbon_monoxide`;
   
-  const [weatherRes, airQualityRes] = await Promise.all([
-    fetch(weatherUrl),
-    fetch(pollenUrl)
-  ]);
+  try {
+    const [weatherRes, airQualityRes] = await Promise.all([
+      fetch(weatherUrl),
+      fetch(pollenUrl)
+    ]);
 
-  const weatherData = await weatherRes.json();
-  const airQualityData = await airQualityRes.json();
-  
-  const current = weatherData.current;
-  const currentCondition = WMO_MAP[current.weather_code] || { description: 'Unknown', atmosphere: 'clear' };
-  const alerts = generateAlerts(current);
-
-  const pollen = airQualityData.current ? {
-    alder: airQualityData.current.alder_pollen || 0,
-    birch: airQualityData.current.birch_pollen || 0,
-    grass: airQualityData.current.grass_pollen || 0,
-    mugwort: airQualityData.current.mugwort_pollen || 0,
-    olive: airQualityData.current.olive_pollen || 0,
-    ragweed: airQualityData.current.ragweed_pollen || 0,
-  } : null;
-
-  const getAQILabel = (index: number) => {
-    if (index <= 20) return { label: 'Good', color: 'text-emerald-400' };
-    if (index <= 40) return { label: 'Fair', color: 'text-yellow-400' };
-    if (index <= 60) return { label: 'Moderate', color: 'text-orange-400' };
-    if (index <= 80) return { label: 'Poor', color: 'text-rose-400' };
-    return { label: 'Very Poor', color: 'text-purple-400' };
-  };
-
-  const aqiInfo = airQualityData.current ? getAQILabel(airQualityData.current.european_aqi) : { label: 'Unknown', color: 'text-white/40' };
-
-  const aqi = airQualityData.current ? {
-    index: airQualityData.current.european_aqi,
-    label: aqiInfo.label,
-    color: aqiInfo.color,
-    pollutants: {
-      pm2_5: airQualityData.current.pm2_5 || 0,
-      pm10: airQualityData.current.pm10 || 0,
-      no2: airQualityData.current.nitrogen_dioxide || 0,
-      o3: airQualityData.current.ozone || 0,
-      so2: airQualityData.current.sulphur_dioxide || 0,
-      co: airQualityData.current.carbon_monoxide || 0,
+    if (weatherRes.status === 429 || airQualityRes.status === 429) {
+      throw new Error('API limit reached. Please try again later.');
     }
-  } : null;
 
-  return {
-    current: {
-      temp: Math.round(current.temperature_2m),
-      description: currentCondition.description,
-      conditionCode: current.weather_code,
-      windSpeed: current.wind_speed_10m,
-      windDir: current.wind_direction_10m,
-      humidity: current.relative_humidity_2m,
-      uvIndex: current.uv_index,
-      visibility: current.visibility,
-      pressure: current.surface_pressure,
-      cloudCover: current.cloud_cover,
-      precipitation: current.precipitation,
-      feelsLike: Math.round(current.apparent_temperature),
-      isDay: current.is_day === 1,
-      sunrise: weatherData.daily.sunrise[0],
-      sunset: weatherData.daily.sunset[0],
-    },
-    hourly: weatherData.hourly.time.map((time: string, i: number) => ({
-      time,
-      temp: Math.round(weatherData.hourly.temperature_2m[i]),
-      conditionCode: weatherData.hourly.weather_code[i],
-      precipitation: weatherData.hourly.precipitation[i],
-      cloudCover: weatherData.hourly.cloud_cover[i],
-      isDay: weatherData.hourly.is_day[i] === 1,
-    })),
-    daily: weatherData.daily.time.map((date: string, i: number) => ({
-      date,
-      maxTemp: Math.round(weatherData.daily.temperature_2m_max[i]),
-      minTemp: Math.round(weatherData.daily.temperature_2m_min[i]),
-      conditionCode: weatherData.daily.weather_code[i],
-      precipitationSum: weatherData.daily.precipitation_sum[i],
-    })),
-    location: {
-      name: locationName,
-      country,
-      lat,
-      lon,
-      timezone: weatherData.timezone,
-    },
-    alerts,
-    pollen,
-    airQuality: aqi,
-  };
+    if (!weatherRes.ok || !airQualityRes.ok) {
+      throw new Error(`Satellite link unstable (Status: ${weatherRes.status}/${airQualityRes.status})`);
+    }
+
+    const weatherData = await weatherRes.json();
+    const airQualityData = await airQualityRes.json();
+
+    if (weatherData.error) {
+      if (weatherData.reason?.includes('location')) {
+        throw new Error('Location coordinates out of bounds or invalid.');
+      }
+      throw new Error(weatherData.reason || 'Telemetry data corrupted');
+    }
+    
+    const current = weatherData.current;
+    if (!current) throw new Error('Real-time telemetry unavailable');
+
+    const currentCondition = WMO_MAP[current.weather_code] || { description: 'Unknown', atmosphere: 'clear' };
+    const alerts = generateAlerts(current);
+
+    const pollen = airQualityData.current ? {
+      alder: airQualityData.current.alder_pollen || 0,
+      birch: airQualityData.current.birch_pollen || 0,
+      grass: airQualityData.current.grass_pollen || 0,
+      mugwort: airQualityData.current.mugwort_pollen || 0,
+      olive: airQualityData.current.olive_pollen || 0,
+      ragweed: airQualityData.current.ragweed_pollen || 0,
+    } : null;
+
+    const getAQILabel = (index: number) => {
+      if (index <= 20) return { label: 'Good', color: 'text-emerald-400' };
+      if (index <= 40) return { label: 'Fair', color: 'text-yellow-400' };
+      if (index <= 60) return { label: 'Moderate', color: 'text-orange-400' };
+      if (index <= 80) return { label: 'Poor', color: 'text-rose-400' };
+      return { label: 'Very Poor', color: 'text-purple-400' };
+    };
+
+    const aqiInfo = airQualityData.current ? getAQILabel(airQualityData.current.european_aqi) : { label: 'Unknown', color: 'text-white/40' };
+
+    const aqi = airQualityData.current ? {
+      index: airQualityData.current.european_aqi,
+      label: aqiInfo.label,
+      color: aqiInfo.color,
+      pollutants: {
+        pm2_5: airQualityData.current.pm2_5 || 0,
+        pm10: airQualityData.current.pm10 || 0,
+        no2: airQualityData.current.nitrogen_dioxide || 0,
+        o3: airQualityData.current.ozone || 0,
+        so2: airQualityData.current.sulphur_dioxide || 0,
+        co: airQualityData.current.carbon_monoxide || 0,
+      }
+    } : null;
+
+    return {
+      current: {
+        temp: Math.round(current.temperature_2m),
+        description: currentCondition.description,
+        conditionCode: current.weather_code,
+        windSpeed: current.wind_speed_10m,
+        windDir: current.wind_direction_10m,
+        humidity: current.relative_humidity_2m,
+        uvIndex: current.uv_index,
+        visibility: current.visibility,
+        pressure: current.surface_pressure,
+        cloudCover: current.cloud_cover,
+        precipitation: current.precipitation,
+        feelsLike: Math.round(current.apparent_temperature),
+        isDay: current.is_day === 1,
+        sunrise: weatherData.daily.sunrise[0],
+        sunset: weatherData.daily.sunset[0],
+      },
+      hourly: weatherData.hourly.time.map((time: string, i: number) => ({
+        time,
+        temp: Math.round(weatherData.hourly.temperature_2m[i]),
+        feelsLike: Math.round(weatherData.hourly.apparent_temperature[i]),
+        conditionCode: weatherData.hourly.weather_code[i],
+        precipitation: weatherData.hourly.precipitation[i],
+        cloudCover: weatherData.hourly.cloud_cover[i],
+        uvIndex: weatherData.hourly.uv_index[i],
+        isDay: weatherData.hourly.is_day[i] === 1,
+      })),
+      daily: weatherData.daily.time.map((date: string, i: number) => ({
+        date,
+        maxTemp: Math.round(weatherData.daily.temperature_2m_max[i]),
+        minTemp: Math.round(weatherData.daily.temperature_2m_min[i]),
+        maxfeelsLike: Math.round(weatherData.daily.apparent_temperature_max[i]),
+        minfeelsLike: Math.round(weatherData.daily.apparent_temperature_min[i]),
+        conditionCode: weatherData.daily.weather_code[i],
+        precipitationSum: weatherData.daily.precipitation_sum[i],
+      })),
+      location: {
+        name: locationName,
+        country,
+        lat,
+        lon,
+        timezone: weatherData.timezone,
+      },
+      alerts,
+      pollen,
+      airQuality: aqi,
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Atmospheric telemetry failure: Connection lost');
+  }
 }
 
 export async function getLocationFromCoords(lat: number, lon: number): Promise<{ name: string; country: string }> {

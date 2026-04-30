@@ -13,7 +13,7 @@ import { PollenSection } from './components/PollenSection';
 import { AQISection } from './components/AQISection';
 import { LocationConfirmModal } from './components/LocationConfirmModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { AlertCircle, RotateCw, Check } from 'lucide-react';
+import { AlertCircle, RotateCw, Check, Cloud } from 'lucide-react';
 import { convertTemperature } from './lib/conversions';
 import { cn } from './lib/utils';
 
@@ -53,7 +53,7 @@ export default function App() {
       setTimeout(() => setShowSuccess(false), 2000);
     } catch (err) {
       console.error(err);
-      setError('Could not update weather. Please try again.');
+      setError(err instanceof Error ? err.message : 'Could not update weather. Please try again.');
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -131,53 +131,74 @@ export default function App() {
         mode={backgroundMode}
       />
       
-      <main className="max-w-7xl mx-auto px-6 py-12 flex flex-col min-h-screen relative z-10 pointer-events-none">
+      <main className={cn(
+        "flex flex-col min-h-screen relative z-10 pointer-events-none transition-all duration-1000",
+        backgroundMode === 'globe' ? "max-w-none w-full" : "max-w-7xl mx-auto px-6 py-12"
+      )}>
         {/* Header / Search */}
-        <div className="mb-12 pointer-events-none">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-12">
+        <div className={cn(
+          "mb-12 pointer-events-none transition-all duration-700",
+          backgroundMode === 'globe' ? "p-6 lg:fixed lg:top-0 lg:left-0 lg:w-full lg:z-50" : ""
+        )}>
+          <div className={cn(
+            "flex justify-between gap-8 mb-12",
+            backgroundMode === 'globe' ? "flex-row items-center max-w-7xl mx-auto" : "flex-col md:flex-row items-center"
+          )}>
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center gap-3 shrink-0 pointer-events-auto"
             >
-              <div className={cn(
-                "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-700 cursor-pointer",
-                backgroundMode === 'atmosphere' 
-                  ? "bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg" 
-                  : "bg-transparent border-transparent"
-              )}>
+              <div 
+                style={{ borderWidth: '1px', borderColor: '#f1eaea' }}
+                className={cn(
+                  "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-700 cursor-pointer",
+                  backgroundMode === 'atmosphere' 
+                    ? "bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg" 
+                    : "bg-transparent border-transparent"
+                )}
+              >
                 <WeatherIcon code={weather?.current.conditionCode || 0} isDay={isDay} size={28} />
               </div>
               <div className="flex flex-col items-start gap-2">
                 <h1 className="text-2xl font-bold tracking-tight">Atmosphere</h1>
                 <div className="flex flex-wrap gap-2">
-                  <span className={cn(
-                    "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700",
-                    backgroundMode === 'atmosphere'
-                      ? "text-white/40 bg-white/5 backdrop-blur-md border border-white/10"
-                      : "text-white/60 bg-transparent border-transparent"
-                  )}>
+                  <span 
+                    style={{ borderWidth: '1.4px', borderColor: '#dad8d8' }}
+                    className={cn(
+                      "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700",
+                      backgroundMode === 'atmosphere'
+                        ? "text-white/40 bg-white/5 backdrop-blur-md border border-white/10"
+                        : "text-white/60 bg-transparent border-transparent"
+                    )}
+                  >
                     {weather 
                       ? format(new Date(new Date().toLocaleString('en-US', { timeZone: weather.location.timezone })), 'EEEE, MMMM do')
                       : format(currentTime, 'EEEE, MMMM do')}
                   </span>
-                  <span className={cn(
-                    "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700",
-                    backgroundMode === 'atmosphere'
-                      ? "text-white/40 bg-white/5 backdrop-blur-md border border-white/10"
-                      : "text-white/60 bg-transparent border-transparent"
-                  )}>
+                  <span 
+                    style={{ borderWidth: '3px', borderColor: '#f0e8e8', backgroundColor: '#3c71d7' }}
+                    className={cn(
+                      "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700",
+                      backgroundMode === 'atmosphere'
+                        ? "text-white/40 bg-white/5 backdrop-blur-md border border-white/10"
+                        : "text-white/60 bg-transparent border-transparent"
+                    )}
+                  >
                     {weather 
                       ? format(new Date(new Date().toLocaleString('en-US', { timeZone: weather.location.timezone })), 'HH:mm:ss')
                       : format(currentTime, 'HH:mm:ss')}
                   </span>
                   {weather?.location.timezone && (
-                    <span className={cn(
-                      "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700",
-                      backgroundMode === 'atmosphere'
-                        ? "text-sky-400/60 bg-sky-400/5 backdrop-blur-md border border-sky-400/10"
-                        : "text-sky-400 bg-transparent border-transparent"
-                    )}>
+                    <span 
+                      style={{ borderWidth: '1.8px', borderColor: '#24c2e7' }}
+                      className={cn(
+                        "text-[9px] uppercase tracking-[0.2em] font-black py-1 px-2.5 rounded-full transition-all duration-700",
+                        backgroundMode === 'atmosphere'
+                          ? "text-sky-400/60 bg-sky-400/5 backdrop-blur-md border border-sky-400/10"
+                          : "text-sky-400 bg-transparent border-transparent"
+                      )}
+                    >
                       {weather.location.timezone.replace('_', ' ')}
                     </span>
                   )}
@@ -219,6 +240,7 @@ export default function App() {
                   <button
                     onClick={handleRefresh}
                     disabled={loading || isRefreshing}
+                    style={{ borderColor: '#f0e9e9', borderWidth: '2px' }}
                     className={cn(
                       "relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 overflow-hidden group duration-700 cursor-pointer",
                       backgroundMode === 'atmosphere'
@@ -460,71 +482,114 @@ export default function App() {
                 </motion.div>
               </div>
 
-              <div className="text-center space-y-10">
-                <div className="space-y-4 px-6">
+              <div className="text-center space-y-12">
+                <div className="space-y-6 px-6">
                   <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex items-center justify-center gap-4 mb-2"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="flex flex-col items-center gap-2"
                   >
-                    <span className="h-px w-8 sm:w-12 bg-gradient-to-r from-transparent to-white/20" />
-                    <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.6em] text-white/40">Observing Celestial Gates</span>
-                    <span className="h-px w-8 sm:w-12 bg-gradient-to-l from-transparent to-white/20" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.8em] text-sky-400/60 ml-[0.8em]">Welcome</span>
+                    <div className="h-px w-12 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                   </motion.div>
                   
-                  <motion.h2 
-                    animate={{ 
-                      opacity: [0.6, 1, 0.6],
-                      letterSpacing: ["0.6em", "0.8em", "0.6em"]
-                    }}
-                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                    className="text-xs sm:text-sm font-black uppercase text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]"
-                  >
-                    Syncing Star Map
-                  </motion.h2>
-                  
-                  <div className="flex flex-col items-center gap-3">
-                    <p className="text-[8px] sm:text-[10px] font-bold text-sky-400/50 uppercase tracking-[0.4em]">
-                      Celestial Matrix Alignment
-                    </p>
-                    <div className="w-40 sm:w-48 h-0.5 bg-white/5 rounded-full overflow-hidden relative">
+                  <div className="space-y-4">
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.8 }}
+                      className="relative inline-block"
+                    >
+                      <motion.h1 
+                        className="text-3xl sm:text-4xl font-black uppercase tracking-[0.4em] text-white"
+                      >
+                        Mykeall
+                      </motion.h1>
                       <motion.div 
-                        animate={{ 
-                          x: ['-100%', '100%']
-                        }}
-                        transition={{ 
-                          duration: 3, 
-                          repeat: Infinity, 
-                          ease: "easeInOut" 
-                        }}
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-sky-400/50 to-transparent w-1/2"
+                        initial={{ width: 0 }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: 1.5, delay: 0.5, ease: "circOut" }}
+                        className="absolute -bottom-2 left-0 h-[3px] bg-gradient-to-r from-sky-400 to-transparent"
                       />
+                    </motion.div>
+                    
+                    <motion.p 
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 1 }}
+                      className="text-[12px] sm:text-sm font-black text-sky-400/80 uppercase tracking-[0.6em] pt-4"
+                    >
+                      Atmospheric Prime
+                    </motion.p>
+                  </div>
+                  
+                  <div className="flex flex-col items-center gap-6 pt-4">
+                    <div className="flex items-center gap-3">
+                      <motion.div 
+                        animate={{ scale: [1, 1.4, 1], opacity: [0.6, 1, 0.6] }}
+                        transition={{ duration: 3, repeat: Infinity }}
+                        className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.6)]"
+                      />
+                      <motion.p 
+                        className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em]"
+                      >
+                        Celestial System: Optimized
+                      </motion.p>
+                    </div>
+                    
+                    <div className="w-56 sm:w-64 space-y-6">
+                      <div className="h-[1px] w-full bg-white/10 rounded-full overflow-hidden relative">
+                        <motion.div 
+                          animate={{ x: ['-100%', '100%'] }}
+                          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-sky-400 to-transparent w-3/4"
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1 text-left">
+                          <span className="block text-[7px] font-black text-white/20 uppercase tracking-widest">Environment</span>
+                          <span className="block text-[8px] font-mono text-sky-400/80 leading-tight">ION_SCAN_READY</span>
+                        </div>
+                        
+                        <div className="space-y-2 text-right">
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 1.5 }}
+                            className="bg-sky-500/10 border border-sky-400/20 px-3 py-1 rounded-full inline-block"
+                          >
+                            <span className="text-[9px] font-black text-sky-300 uppercase tracking-widest">Welcome Home</span>
+                          </motion.div>
+                          
+                          <div className="space-y-1">
+                            <span className="block text-[7px] font-black text-white/20 uppercase tracking-widest">Atmosphere</span>
+                            <span className="block text-[8px] font-mono text-sky-400/80 leading-tight">ACTIVE_PRIME_01</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-center gap-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex flex-col gap-0.5">
-                      {[...Array(3)].map((_, j) => (
-                        <motion.div
-                          key={j}
-                          animate={{ 
-                            opacity: [0.1, 0.8, 0.1],
-                            scale: [0.8, 1.2, 0.8]
-                          }}
-                          transition={{ 
-                            duration: 1, 
-                            repeat: Infinity, 
-                            delay: (i * 0.2) + (j * 0.1),
-                            ease: "easeInOut" 
-                          }}
-                          className="w-1 h-1 bg-sky-400/60 rounded-full"
-                        />
-                      ))}
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1.5 }}
+                  className="flex items-center justify-center gap-6"
+                >
+                  {[
+                    { label: 'CALIB', val: '99%' },
+                    { label: 'UPLINK', val: 'STABLE' },
+                    { label: 'REGION', val: 'GLOBAL' }
+                  ].map((stat, i) => (
+                    <div key={i} className="flex flex-col items-center gap-1">
+                      <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">{stat.label}</span>
+                      <span className="text-[9px] font-bold text-sky-400/40 tracking-tighter">{stat.val}</span>
                     </div>
                   ))}
-                </div>
+                </motion.div>
               </div>
             </motion.div>
 
@@ -541,153 +606,185 @@ export default function App() {
             </div>
           </div>
         ) : weather ? (
-          <div className="flex-1 overflow-auto pointer-events-auto custom-scrollbar">
-            <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+          <div className={cn(
+            "flex-1 flex flex-col transition-all duration-1000",
+            backgroundMode === 'globe' ? "overflow-hidden" : "overflow-auto custom-scrollbar"
+          )}>
+            <div className={cn(
+              "transition-all duration-1000 flex flex-col",
+              backgroundMode === 'globe' 
+                ? "fixed bottom-12 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 pointer-events-auto z-50" 
+                : "flex-1 max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8"
+            )}>
               {/* High-Impact Hero Section */}
               <motion.div 
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 className={cn(
-                  "relative rounded-[48px] overflow-hidden group mb-12 transition-all duration-700",
-                  backgroundMode === 'atmosphere'
-                    ? "p-8 sm:p-12 bg-white/5 backdrop-blur-3xl border border-white/10 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)]"
-                    : "p-4 sm:p-6 bg-transparent border-transparent shadow-none scale-95 origin-left"
+                  "relative rounded-[40px] overflow-hidden group transition-all duration-700 shrink-0 shadow-2xl",
+                  backgroundMode === 'globe'
+                    ? "p-8 bg-black/40 backdrop-blur-3xl border border-white/10"
+                    : "p-8 sm:p-12 bg-white/5 backdrop-blur-3xl border border-white/10"
                 )}
               >
-                {/* Subtle Animated Glow */}
-                <motion.div 
-                  animate={{ 
-                    scale: [1, 1.2, 1],
-                    opacity: [0.1, 0.2, 0.1],
-                  }}
-                  transition={{ duration: 10, repeat: Infinity }}
-                  className="absolute -top-[20%] -right-[10%] w-[60%] h-[60%] bg-sky-400/20 blur-[120px] rounded-full"
-                />
+                {backgroundMode === 'atmosphere' && (
+                  <motion.div 
+                    animate={{ 
+                      scale: [1, 1.2, 1],
+                      opacity: [0.1, 0.2, 0.1],
+                    }}
+                    transition={{ duration: 10, repeat: Infinity }}
+                    className="absolute -top-[20%] -right-[10%] w-[60%] h-[60%] bg-sky-400/20 blur-[120px] rounded-full"
+                  />
+                )}
 
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
+                <div className={cn(
+                  "relative z-10 flex flex-col gap-8",
+                  backgroundMode !== 'globe' ? "md:flex-row md:items-center justify-between" : "items-center"
+                )}>
+                  <div className={cn(
+                    "space-y-4",
+                    backgroundMode === 'globe' ? "text-center" : "text-left"
+                  )}>
+                    <div className={cn(
+                      "flex items-center gap-3",
+                      backgroundMode === 'globe' ? "justify-center" : ""
+                    )}>
                       <div className={cn(
                         "px-3 py-1 rounded-full transition-all duration-700",
                         backgroundMode === 'atmosphere'
-                          ? "bg-sky-500/20 border border-sky-400/30 shadow-lg"
-                          : "bg-transparent border-transparent shadow-none"
+                          ? "bg-sky-500/20 border border-sky-400/30"
+                          : "bg-white/10 border border-white/10"
                       )}>
                         <span className={cn(
-                          "text-[10px] font-black uppercase tracking-[0.2em] transition-all",
+                          "text-[9px] font-black uppercase tracking-[0.2em] transition-all",
                           backgroundMode === 'atmosphere' ? "text-sky-300" : "text-sky-400"
-                        )}>Current Atmosphere</span>
+                        )}>Atmospheric State</span>
                       </div>
-                      {weather.alerts.length > 0 && (
-                        <div className={cn(
-                          "flex items-center gap-1.5 px-3 py-1 rounded-full animate-pulse transition-all",
-                          backgroundMode === 'atmosphere'
-                            ? "bg-rose-500/20 border border-rose-400/30"
-                            : "bg-transparent border-transparent"
-                        )}>
-                          <AlertCircle size={10} className="text-rose-400" />
-                          <span className="text-[10px] font-black text-rose-300 uppercase tracking-widest">{weather.alerts.length} Alert{weather.alerts.length > 1 ? 's' : ''}</span>
-                        </div>
-                      )}
                     </div>
                     
-                    <div className="space-y-0">
-                      <h1 className="text-5xl sm:text-7xl font-thin tracking-tighter text-white leading-none">
+                    <div className="space-y-2">
+                      <h1 className={cn(
+                        "font-thin tracking-tighter text-white leading-[1.1] transition-all",
+                        backgroundMode === 'globe' ? "text-4xl sm:text-5xl" : "text-5xl sm:text-7xl"
+                      )}>
                         {weather.location.name}
                       </h1>
-                      <p className="text-xs sm:text-sm font-medium text-white/40 tracking-[0.2em] uppercase mt-4">
-                        {weather.location.country} • {format(new Date(new Date().toLocaleString('en-US', { timeZone: weather.location.timezone })), 'EEEE, MMMM do')}
+                      <p className="text-[10px] font-black text-sky-400/60 tracking-[0.4em] uppercase">
+                        {weather.location.country}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-6 sm:gap-10">
-                    <div className="text-right">
+                  <div className={cn(
+                    "flex items-center gap-8",
+                    backgroundMode === 'globe' ? "justify-center" : "sm:gap-12"
+                  )}>
+                    <div className="text-center">
                       <motion.div 
                         key={`${units.temperature}-${weather.current.temp}`}
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        className="text-8xl sm:text-[10rem] font-thin tracking-tighter text-white leading-none inline-flex items-start"
+                        className={cn(
+                          "font-thin tracking-tighter text-white leading-none inline-flex items-start transition-all",
+                          backgroundMode === 'globe' ? "text-6xl sm:text-7xl" : "text-8xl sm:text-[10rem]"
+                        )}
                       >
                         {convertTemperature(weather.current.temp, units.temperature)}
-                        <span className="text-4xl sm:text-6xl mt-6 opacity-30 font-light">°</span>
+                        <span className={cn(
+                          "opacity-30 font-light",
+                          backgroundMode === 'globe' ? "text-2xl mt-1" : "text-4xl sm:text-6xl mt-6"
+                        )}>°</span>
                       </motion.div>
-                      <p className="text-sm sm:text-lg font-black text-white/50 uppercase tracking-[0.3em] mt-2">
-                        {weather.current.description}
-                      </p>
+                      {backgroundMode === 'globe' && (
+                        <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em] mt-2">
+                          {weather.current.description}
+                        </p>
+                      )}
                     </div>
+                    
                     <div className={cn(
-                      "p-8 sm:p-10 rounded-[48px] transition-all duration-500 hover:scale-105 active:scale-95 group-hover:bg-white/10 cursor-pointer",
+                      "rounded-full transition-all duration-500 hover:scale-105 active:scale-95 flex items-center justify-center shrink-0",
                       backgroundMode === 'atmosphere'
-                        ? "bg-white/5 border border-white/10 shadow-2xl"
-                        : "bg-transparent border-transparent"
+                        ? "p-8 sm:p-10 bg-white/5 border border-white/10"
+                        : "p-4 bg-white/5 border border-white/10",
+                      backgroundMode === 'globe' ? "w-20 h-20" : "w-auto h-auto"
                     )}>
-                      <WeatherIcon code={weather.current.conditionCode} isDay={weather.current.isDay} size={80} className="sm:w-[100px] sm:h-[100px]" />
+                      <WeatherIcon 
+                        code={weather.current.conditionCode} 
+                        isDay={weather.current.isDay} 
+                        size={backgroundMode === 'globe' ? 44 : 80} 
+                      />
                     </div>
                   </div>
                 </div>
               </motion.div>
 
-              {/* Weather Analytics */}
-              <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-                <div className="xl:col-span-3 space-y-12">
-                  <section>
-                    <div className="flex items-center gap-4 mb-8">
-                      <h2 className="text-[11px] font-black text-white/30 uppercase tracking-[0.4em]">Environmental Diagnostics</h2>
-                      <div className="h-px flex-1 bg-white/5" />
-                    </div>
-                    <WeatherMetrics 
-                      windSpeed={weather.current.windSpeed}
-                      windDir={weather.current.windDir}
-                      humidity={weather.current.humidity}
-                      uvIndex={weather.current.uvIndex}
-                      visibility={weather.current.visibility}
-                      pressure={weather.current.pressure}
-                      cloudCover={weather.current.cloudCover}
-                      precipitation={weather.current.precipitation}
-                      feelsLike={weather.current.feelsLike}
-                      sunrise={weather.current.sunrise}
-                      sunset={weather.current.sunset}
-                      units={units}
-                    />
-                  </section>
-                  
-                  <section>
-                    <div className="flex items-center gap-4 mb-8">
-                      <h2 className="text-[11px] font-black text-white/30 uppercase tracking-[0.4em]">Temporal Projection</h2>
-                      <div className="h-px flex-1 bg-white/5" />
-                    </div>
-                    <ForecastSection 
-                      hourly={weather.hourly} 
-                      daily={weather.daily}
-                      units={units}
-                      timezone={weather.location.timezone}
-                    />
-                  </section>
+              {/* Weather Analytics - Collapsed in Globe Mode */}
+              {backgroundMode !== 'globe' ? (
+                <div className="grid gap-8 pb-12 flex-1 grid-cols-1 xl:grid-cols-4">
+                  <div className="space-y-12 xl:col-span-3">
+                    <section>
+                      <div className="flex items-center gap-4 mb-8">
+                        <h2 className="text-[11px] font-black text-white/30 uppercase tracking-[0.4em]">Environmental Diagnostics</h2>
+                        <div className="h-px flex-1 bg-white/5" />
+                      </div>
+                      <WeatherMetrics 
+                        windSpeed={weather.current.windSpeed}
+                        windDir={weather.current.windDir}
+                        humidity={weather.current.humidity}
+                        uvIndex={weather.current.uvIndex}
+                        visibility={weather.current.visibility}
+                        pressure={weather.current.pressure}
+                        cloudCover={weather.current.cloudCover}
+                        precipitation={weather.current.precipitation}
+                        feelsLike={weather.current.feelsLike}
+                        sunrise={weather.current.sunrise}
+                        sunset={weather.current.sunset}
+                        units={units}
+                        isAtmosphereMode={backgroundMode === 'atmosphere'}
+                        hourly={weather.hourly}
+                      />
+                    </section>
+                    
+                    <section>
+                      <div className="flex items-center gap-4 mb-8">
+                        <h2 className="text-[11px] font-black text-white/30 uppercase tracking-[0.4em]">Temporal Projection</h2>
+                        <div className="h-px flex-1 bg-white/5" />
+                      </div>
+                      <ForecastSection 
+                        hourly={weather.hourly} 
+                        daily={weather.daily}
+                        units={units}
+                        timezone={weather.location.timezone}
+                        isAtmosphereMode={backgroundMode === 'atmosphere'}
+                      />
+                    </section>
+                  </div>
+
+                  <div className="space-y-12">
+                    <section>
+                      <div className="flex items-center gap-4 mb-8">
+                        <h2 className="text-[11px] font-black text-white/30 uppercase tracking-[0.4em]">Atmosphere</h2>
+                        <div className="h-px flex-1 bg-white/5" />
+                      </div>
+                      <AQISection data={weather.airQuality} />
+                    </section>
+
+                    <section>
+                      <div className="flex items-center gap-4 mb-8">
+                        <h2 className="text-[11px] font-black text-white/30 uppercase tracking-[0.4em]">Botany Report</h2>
+                        <div className="h-px flex-1 bg-white/5" />
+                      </div>
+                      <PollenSection data={weather.pollen} />
+                    </section>
+                  </div>
                 </div>
+              ) : null}
 
-                <div className="space-y-12">
-                  <section>
-                    <div className="flex items-center gap-4 mb-8">
-                      <h2 className="text-[11px] font-black text-white/30 uppercase tracking-[0.4em]">Atmosphere</h2>
-                      <div className="h-px flex-1 bg-white/5" />
-                    </div>
-                    <AQISection data={weather.airQuality} />
-                  </section>
-
-                  <section>
-                    <div className="flex items-center gap-4 mb-8">
-                      <h2 className="text-[11px] font-black text-white/30 uppercase tracking-[0.4em]">Botany Report</h2>
-                      <div className="h-px flex-1 bg-white/5" />
-                    </div>
-                    <PollenSection data={weather.pollen} />
-                  </section>
-                </div>
-              </div>
-
-              {weather.alerts.length > 0 && (
-                <section className="pt-8">
+              {weather.alerts.length > 0 && backgroundMode !== 'globe' && (
+                <section className="pt-8 pb-12">
                   <div className="flex items-center gap-4 mb-8">
                     <h2 className="text-[11px] font-black text-rose-500/50 uppercase tracking-[0.4em]">Security Alerts</h2>
                     <div className="h-px flex-1 bg-rose-500/10" />
@@ -696,25 +793,25 @@ export default function App() {
                 </section>
               )}
               
-              <footer className="pt-24 pb-8 flex flex-col items-center gap-6">
-                <div className="flex items-center gap-10">
-                  <div className="flex flex-col items-center">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Telemetry Source</span>
-                    <span className="text-xs font-bold text-white/50">NOAA / Open-Meteo V5</span>
+              {backgroundMode !== 'globe' && (
+                <footer className="pt-24 pb-12 flex flex-col gap-6 shrink-0 items-center">
+                  <div className="flex items-center justify-center gap-6">
+                    {[
+                      { label: 'TELEMETRY', val: 'OPEN-METEO' },
+                      { label: 'CALIBRATION', val: 'PRIME' }
+                    ].map((stat, i) => (
+                      <div key={i} className="flex flex-col items-center">
+                        <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">{stat.label}</span>
+                        <span className="text-[9px] font-bold text-sky-400/40">{stat.val}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="w-px h-8 bg-white/10" />
-                  <div className="flex flex-col items-center">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Compute Mode</span>
-                    <span className="text-xs font-bold text-sky-400/60 uppercase">Maximum Precision</span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-center gap-2">
                   <div className="h-px w-20 bg-white/10" />
-                  <p className="text-[10px] text-white/10 font-medium uppercase tracking-[5px]">
-                    Atmospheric Precision Engine. 2026 Edition
+                  <p className="text-[9px] font-black text-white/10 uppercase tracking-[0.5em]">
+                    Atmospheric Precision Engine • 2026
                   </p>
-                </div>
-              </footer>
+                </footer>
+              )}
             </div>
           </div>
         ) : null}

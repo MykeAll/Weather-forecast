@@ -16,9 +16,10 @@ interface MetricProps {
   isHighRisk?: boolean;
   onClick?: () => void;
   className?: string;
+  isAtmosphereMode?: boolean;
 }
 
-const CelestialPhase: React.FC<{ sunrise: string; sunset: string; delay?: number }> = ({ sunrise, sunset, delay = 0 }) => {
+const CelestialPhase: React.FC<{ sunrise: string; sunset: string; delay?: number; isAtmosphereMode?: boolean }> = ({ sunrise, sunset, delay = 0, isAtmosphereMode = true }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isDay, setIsDay] = useState(true);
@@ -73,7 +74,10 @@ const CelestialPhase: React.FC<{ sunrise: string; sunset: string; delay?: number
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay, duration: 0.8 }}
       onClick={() => setShowDetails(!showDetails)}
-      className="col-span-2 bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-3xl flex flex-col items-center justify-center transition-all group relative overflow-hidden text-center hover:bg-white/10 cursor-pointer"
+      className={cn(
+        "col-span-2 p-5 rounded-3xl flex flex-col items-center justify-center transition-all group relative overflow-hidden text-center cursor-pointer",
+        isAtmosphereMode ? "bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10" : "bg-white/10 border border-white/20 hover:bg-white/20"
+      )}
     >
       <div className="absolute top-4 right-4">
         <Info size={12} className="text-white/20 group-hover:text-white/40 transition-colors" />
@@ -175,14 +179,15 @@ const WindCompass: React.FC<{ direction: number }> = ({ direction }) => (
   </div>
 );
 
-const Metric: React.FC<MetricProps> = ({ label, value, unit, icon, accessory, isHighRisk, onClick, delay = 0 }) => (
+const Metric: React.FC<MetricProps> = ({ label, value, unit, icon, accessory, isHighRisk, onClick, delay = 0, isAtmosphereMode = true }) => (
   <motion.button
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay, duration: 0.8, ease: "easeOut" }}
     onClick={onClick}
     className={cn(
-      "bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-3xl flex flex-col justify-between transition-all group h-full relative overflow-hidden text-left",
+      "p-5 rounded-3xl flex flex-col justify-between transition-all group h-full relative overflow-hidden text-left",
+      isAtmosphereMode ? "bg-white/5 backdrop-blur-md border border-white/10" : "bg-white/10 border border-white/20",
       onClick ? "hover:bg-white/10 cursor-pointer" : "pointer-events-none",
       isHighRisk && "border-orange-500/30 bg-orange-500/5 shadow-[0_0_20px_rgba(249,115,22,0.1)]"
     )}
@@ -226,6 +231,8 @@ const Metric: React.FC<MetricProps> = ({ label, value, unit, icon, accessory, is
   </motion.button>
 );
 
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
 interface WeatherMetricsProps {
   windSpeed: number;
   windDir: number;
@@ -239,7 +246,61 @@ interface WeatherMetricsProps {
   sunrise: string;
   sunset: string;
   units: UnitSettings;
+  isAtmosphereMode?: boolean;
+  hourly?: any[]; // For UV trend
 }
+
+const UVTrendChart: React.FC<{ data: any[] }> = ({ data }) => {
+  const chartData = data.slice(0, 24).map(h => ({
+    time: format(parseISO(h.time), 'HH:mm'),
+    uv: h.uvIndex
+  }));
+
+  return (
+    <div className="h-40 w-full mt-6">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={chartData}>
+          <defs>
+            <linearGradient id="uvGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="#fbbf24" stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+          <XAxis 
+            dataKey="time" 
+            axisLine={false} 
+            tickLine={false} 
+            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
+            interval={3}
+          />
+          <YAxis hide domain={[0, 'dataMax + 2']} />
+          <Tooltip 
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                return (
+                  <div className="bg-black/80 backdrop-blur-md border border-white/10 p-2 rounded-lg shadow-xl">
+                    <p className="text-[10px] font-black uppercase text-white/40 mb-1">{payload[0].payload.time}</p>
+                    <p className="text-sm font-bold text-yellow-400">UV Index: {payload[0].value}</p>
+                  </div>
+                );
+              }
+              return null;
+            }}
+          />
+          <Area 
+            type="monotone" 
+            dataKey="uv" 
+            stroke="#fbbf24" 
+            strokeWidth={2}
+            fillOpacity={1} 
+            fill="url(#uvGradient)" 
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
 
 export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
   windSpeed,
@@ -254,6 +315,8 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
   sunrise,
   sunset,
   units,
+  isAtmosphereMode = true,
+  hourly = []
 }) => {
   const [showUVInfo, setShowUVInfo] = useState(false);
   
@@ -326,7 +389,7 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-        <CelestialPhase sunrise={sunrise} sunset={sunset} delay={0.05} />
+        <CelestialPhase sunrise={sunrise} sunset={sunset} delay={0.05} isAtmosphereMode={isAtmosphereMode} />
         
         <Metric 
           label="Wind" 
@@ -335,6 +398,7 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
           icon={<Wind size={18} className="text-blue-300" />} 
           accessory={<WindCompass direction={windDir} />}
           delay={0.1}
+          isAtmosphereMode={isAtmosphereMode}
         />
         <Metric 
           label="Humidity" 
@@ -342,6 +406,7 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
           unit="%" 
           icon={<Droplets size={18} className="text-sky-300" />} 
           delay={0.15}
+          isAtmosphereMode={isAtmosphereMode}
         />
         <Metric 
           label="UV Index" 
@@ -350,6 +415,7 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
           isHighRisk={uvIndex >= 8}
           onClick={() => setShowUVInfo(true)}
           delay={0.2}
+          isAtmosphereMode={isAtmosphereMode}
         />
         <Metric 
           label="Pressure" 
@@ -357,6 +423,7 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
           unit="hPa" 
           icon={<Gauge size={18} className="text-emerald-300" />} 
           delay={0.22}
+          isAtmosphereMode={isAtmosphereMode}
         />
         <Metric 
           label="Precipitation" 
@@ -364,6 +431,7 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
           unit="mm" 
           icon={<CloudRain size={18} className="text-blue-400" />} 
           delay={0.24}
+          isAtmosphereMode={isAtmosphereMode}
         />
         <Metric 
           label="Cloud Cover" 
@@ -371,6 +439,7 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
           unit="%" 
           icon={<Cloud size={18} className="text-white/60" />} 
           delay={0.26}
+          isAtmosphereMode={isAtmosphereMode}
         />
         <Metric 
           label="Visibility" 
@@ -378,6 +447,7 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
           unit="km" 
           icon={<Eye size={18} className="text-indigo-300" />} 
           delay={0.28}
+          isAtmosphereMode={isAtmosphereMode}
         />
         <Metric 
           label="Feels Like" 
@@ -385,18 +455,21 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
           unit={`°${tempUnit}`} 
           icon={<Thermometer size={18} className="text-rose-300" />} 
           delay={0.3}
+          isAtmosphereMode={isAtmosphereMode}
         />
         <Metric 
           label="Sunrise" 
           value={formatTime(sunrise)} 
           icon={<Sunrise size={18} className="text-orange-300" />} 
           delay={0.35}
+          isAtmosphereMode={isAtmosphereMode}
         />
         <Metric 
           label="Sunset" 
           value={formatTime(sunset)} 
           icon={<Sunset size={18} className="text-purple-300" />} 
           delay={0.4}
+          isAtmosphereMode={isAtmosphereMode}
         />
       </div>
 
@@ -447,7 +520,7 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
                     </h4>
                     
                     {/* Detailed Interactive Scale */}
-                    <div className="grid grid-cols-5 gap-1.5 sm:gap-3">
+                    <div className="grid grid-cols-5 gap-1.5 sm:gap-3 px-1">
                       {uvScale.map((level) => {
                         const isActive = (level.label === uvStatus.label) || (uvIndex >= 11 && level.label === 'Extr') || (uvIndex >= 8 && level.label === 'V. High' && uvIndex <= 10);
                         return (
@@ -467,6 +540,12 @@ export const WeatherMetrics: React.FC<WeatherMetricsProps> = ({
                           </div>
                         );
                       })}
+                    </div>
+
+                    {/* UV Trend Chart */}
+                    <div className="space-y-3 pt-2">
+                       <h5 className="text-[10px] font-bold text-white/50 uppercase tracking-widest pl-1">24-Hour Intensity Forecast</h5>
+                       <UVTrendChart data={hourly} />
                     </div>
                   </div>
 

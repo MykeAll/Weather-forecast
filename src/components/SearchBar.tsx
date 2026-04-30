@@ -102,6 +102,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSelect, onLocate, isAtmo
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={isListening ? "Listening..." : "Search for a city..."}
+          style={{ borderWidth: '2.8px' }}
           className={cn(
             "w-full h-14 pl-10 sm:pl-12 pr-20 sm:pr-24 rounded-2xl text-white placeholder:text-white/40 placeholder:text-sm sm:placeholder:text-base focus:outline-none focus:ring-2 focus:ring-white/30 focus:bg-white/20 transition-all duration-700 cursor-text",
             isAtmosphereMode 

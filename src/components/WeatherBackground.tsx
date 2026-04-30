@@ -71,7 +71,7 @@ const StarField: React.FC = () => {
 
     const initStars = () => {
       stars = [];
-      const count = Math.floor((canvas.width * canvas.height) / 4000);
+      const count = Math.min(Math.floor((canvas.width * canvas.height) / 6000), 150);
       for (let i = 0; i < count; i++) {
         const typeRand = Math.random();
         stars.push({
@@ -79,10 +79,10 @@ const StarField: React.FC = () => {
           y: Math.random() * canvas.height,
           size: Math.random() * 1.5 + 0.5,
           alpha: Math.random(),
-          speed: Math.random() * 0.008 + 0.002,
-          drift: Math.random() * 0.04 + 0.01,
-          type: typeRand > 0.95 ? 'flash' : (typeRand > 0.8 ? 'fade' : 'twinkle'),
-          wait: Math.random() * 150
+          speed: Math.random() * 0.015 + 0.005, // Faster twinkling
+          drift: Math.random() * 0.03 + 0.01,
+          type: typeRand > 0.9 ? 'flash' : (typeRand > 0.6 ? 'fade' : 'twinkle'),
+          wait: Math.random() * 100
         });
       }
     };
@@ -155,7 +155,7 @@ const RainEffect: React.FC<{ intensity: number }> = ({ intensity }) => {
     let drops: { x: number; y: number; length: number; speed: number; opacity: number }[] = [];
     let splashes: { x: number; y: number; r: number; rMax: number; alpha: number }[] = [];
 
-    const dropCount = Math.floor(intensity * 300);
+    const dropCount = Math.floor(intensity * 100);
 
     const initDrops = () => {
       drops = [];
@@ -163,9 +163,9 @@ const RainEffect: React.FC<{ intensity: number }> = ({ intensity }) => {
         drops.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height,
-          length: Math.random() * 20 + 15,
-          speed: (Math.random() * 15 + 10) * (0.5 + intensity * 0.5),
-          opacity: Math.random() * 0.3 + 0.1,
+          length: Math.random() * 15 + 10,
+          speed: (Math.random() * 12 + 8) * (0.5 + intensity * 0.5),
+          opacity: Math.random() * 0.2 + 0.1,
         });
       }
     };
@@ -250,7 +250,7 @@ const SnowEffect: React.FC<{ intensity: number }> = ({ intensity }) => {
     let animationFrameId: number;
     let flakes: { x: number; y: number; r: number; d: number; speed: number; shimmer: number; shimmerSpeed: number }[] = [];
 
-    const flakeCount = Math.floor(intensity * 200);
+    const flakeCount = Math.floor(intensity * 80);
 
     const initFlakes = () => {
       flakes = [];
@@ -258,9 +258,9 @@ const SnowEffect: React.FC<{ intensity: number }> = ({ intensity }) => {
         flakes.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height,
-          r: Math.random() * 4 + 1, // radius
+          r: Math.random() * 3 + 1, // radius
           d: Math.random() * flakeCount, // density
-          speed: Math.random() * 1 + 0.5,
+          speed: Math.random() * 0.8 + 0.5,
           shimmer: Math.random(),
           shimmerSpeed: Math.random() * 0.02 + 0.01
         });
@@ -336,9 +336,80 @@ const SunGlare: React.FC = () => {
   );
 };
 
-// --- Lightning Component with Varied Patterns ---
+// --- Realistic Lightning Bolt Component ---
+const LightningBolt: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const startX = Math.random() * canvas.width;
+    const startY = 0;
+    
+    // Generate segments
+    const segments: { x: number; y: number }[] = [{ x: startX, y: startY }];
+    let curX = startX;
+    let curY = startY;
+    const iterations = 15 + Math.random() * 15;
+    const step = canvas.height / iterations;
+
+    for (let i = 0; i < iterations; i++) {
+      curX += (Math.random() - 0.5) * 150;
+      curY += step;
+      segments.push({ x: curX, y: curY });
+      
+      // Random branch
+      if (Math.random() < 0.2) {
+        let bX = curX;
+        let bY = curY;
+        const bLen = 5 + Math.random() * 10;
+        for (let j = 0; j < bLen; j++) {
+           bX += (Math.random() - 0.5) * 100;
+           bY += step * 0.7;
+           // We'll draw these inline
+        }
+      }
+    }
+
+    let alpha = 1;
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = `rgba(200, 220, 255, ${alpha})`;
+      ctx.lineWidth = 2 + Math.random() * 2;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = 'rgba(150, 180, 255, 1)';
+      
+      ctx.beginPath();
+      ctx.moveTo(segments[0].x, segments[0].y);
+      for (let i = 1; i < segments.length; i++) {
+        ctx.lineTo(segments[i].x, segments[i].y);
+      }
+      ctx.stroke();
+
+      alpha -= 0.08;
+      if (alpha > 0) {
+        requestAnimationFrame(animate);
+      } else {
+        onComplete();
+      }
+    };
+
+    animate();
+  }, [onComplete]);
+
+  return <canvas ref={canvasRef} className="absolute inset-0 z-30 pointer-events-none" />;
+};
+
+// --- Lightning Controller Component ---
 const Lightning: React.FC = () => {
   const [opacity, setOpacity] = React.useState(0);
+  const [activeBolts, setActiveBolts] = React.useState<number[]>([]);
 
   useEffect(() => {
     let timeoutId: any;
@@ -346,28 +417,20 @@ const Lightning: React.FC = () => {
     const triggerLightning = () => {
       const type = Math.random();
       
-      if (type < 0.6) {
-        // Single quick flash
-        flash(0.8, 50, () => flash(0, 100));
-      } else if (type < 0.9) {
-        // Double flash
-        flash(1, 40, () => 
-          flash(0, 50, () => 
-            flash(0.7, 40, () => flash(0, 150))
-          )
-        );
-      } else {
-        // Long flicker
-        flash(0.5, 30, () => 
-          flash(0.2, 30, () => 
-            flash(0.9, 30, () => 
-              flash(0.3, 30, () => flash(0, 200))
-            )
-          )
-        );
+      // Trigger bolt component
+      if (Math.random() < 0.7) {
+        setActiveBolts(prev => [...prev, Date.now()]);
       }
 
-      const nextDelay = Math.random() * 8000 + 4000; // 4-12 seconds
+      if (type < 0.6) {
+        flash(0.8, 50, () => flash(0, 100));
+      } else if (type < 0.9) {
+        flash(1, 40, () => flash(0, 50, () => flash(0.7, 40, () => flash(0, 150))));
+      } else {
+        flash(0.5, 30, () => flash(0.2, 30, () => flash(0.9, 30, () => flash(0.3, 30, () => flash(0, 200)))));
+      }
+
+      const nextDelay = Math.random() * 6000 + 2000; // More frequent in stormy conditions
       timeoutId = window.setTimeout(triggerLightning, nextDelay);
     };
 
@@ -375,20 +438,25 @@ const Lightning: React.FC = () => {
       setOpacity(val);
       window.setTimeout(() => {
         if (callback) callback();
+        else setOpacity(0);
       }, duration);
     };
 
-    timeoutId = window.setTimeout(triggerLightning, 5000);
-
+    timeoutId = window.setTimeout(triggerLightning, 3000);
     return () => window.clearTimeout(timeoutId);
   }, []);
 
   return (
-    <motion.div
-      animate={{ opacity }}
-      transition={{ duration: 0.1 }}
-      className="absolute inset-0 bg-white mix-blend-overlay z-20 pointer-events-none"
-    />
+    <>
+      <motion.div
+        animate={{ opacity }}
+        transition={{ duration: 0.1 }}
+        className="absolute inset-0 bg-white/20 mix-blend-overlay z-20 pointer-events-none"
+      />
+      {activeBolts.map(id => (
+        <LightningBolt key={id} onComplete={() => setActiveBolts(prev => prev.filter(b => b !== id))} />
+      ))}
+    </>
   );
 };
 
@@ -499,7 +567,7 @@ const WeatherGlobe: React.FC<{ lat: number, lon: number }> = ({ lat, lon }) => {
   
   // Simulated global weather data points using HexBins for a heatmap look
   const hexData = useMemo(() => {
-    return [...Array(100)].map(() => ({
+    return [...Array(50)].map(() => ({
       lat: (Math.random() - 0.5) * 160,
       lng: (Math.random() - 0.5) * 360,
       temp: Math.random() * 40 - 10, // -10 to 30
@@ -508,18 +576,24 @@ const WeatherGlobe: React.FC<{ lat: number, lon: number }> = ({ lat, lon }) => {
 
   useEffect(() => {
     if (globeRef.current) {
-      globeRef.current.pointOfView({ lat, lng: lon, altitude: 1.8 }, 1500);
+      globeRef.current.pointOfView({ lat, lng: lon, altitude: 2.2 }, 1500);
       const controls = globeRef.current.controls();
       controls.autoRotate = false;
       controls.enableZoom = true;
       controls.minDistance = 150;
-      controls.maxDistance = 600;
+      controls.maxDistance = 1200;
     }
   }, [lat, lon]);
 
   const handleReset = () => {
     if (globeRef.current) {
-      globeRef.current.pointOfView({ lat, lng: lon, altitude: 1.8 }, 1000);
+      // Use a slightly higher altitude for a full globe view
+      globeRef.current.pointOfView({ lat, lng: lon, altitude: 2.5 }, 1200);
+      const controls = globeRef.current.controls();
+      if (controls) {
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.1;
+      }
     }
   };
 
@@ -529,29 +603,30 @@ const WeatherGlobe: React.FC<{ lat: number, lon: number }> = ({ lat, lon }) => {
         ref={globeRef}
         globeImageUrl="//unpkg.com/three-globe/example/img/earth-night.jpg"
         bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
-        backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
-        atmosphereColor="#3b82f6"
-        atmosphereAltitude={0.15}
         backgroundColor="rgba(0,0,0,0)"
+        atmosphereColor="#38bdf8"
+        atmosphereAltitude={0.15}
         
         hexBinPointsData={hexData}
         hexBinPointWeight="temp"
-        hexBinResolution={4}
-        hexMargin={0.1}
+        hexBinResolution={3}
+        hexMargin={0.2}
         hexTopColor={d => d.sumWeight > 20 ? '#f87171' : (d.sumWeight > 5 ? '#fbbf24' : '#38bdf8')}
-        hexSideColor={d => d.sumWeight > 20 ? 'rgba(248,113,113,0.3)' : 'rgba(56,189,248,0.3)'}
+        hexSideColor={d => d.sumWeight > 20 ? 'rgba(248,113,113,0.2)' : 'rgba(56,189,248,0.2)'}
         hexBinMerge={true}
+        
+        ringsData={[{ lat, lng: lon }]}
+        ringColor={() => "#38bdf8"}
+        ringMaxRadius={3}
+        ringPropagationSpeed={1.5}
+        ringRepeatPeriod={1500}
         
         htmlElementsData={[{ lat, lng: lon }]}
         htmlElement={() => {
           const el = document.createElement('div');
           el.innerHTML = `
-            <div class="relative group">
-              <div class="absolute -inset-10 bg-sky-500/20 blur-3xl rounded-full scale-150 animate-pulse"></div>
-              <div class="w-5 h-5 bg-sky-400 border-[3px] border-white rounded-full shadow-[0_0_30px_rgba(56,189,248,1)]"></div>
-              <div class="absolute top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">
-                <span class="text-[10px] font-black text-white uppercase tracking-tighter">Your Location</span>
-              </div>
+            <div class="relative">
+              <div class="w-4 h-4 bg-sky-400 border-2 border-white rounded-full shadow-[0_0_20px_rgba(56,189,248,0.8)]"></div>
             </div>
           `;
           return el;
@@ -590,6 +665,81 @@ const WeatherGlobe: React.FC<{ lat: number, lon: number }> = ({ lat, lon }) => {
       </button>
     </div>
   );
+};
+
+// --- Dust Motes Effect for Clear Sky ---
+const DustMotes: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let motes: { x: number; y: number; size: number; alpha: number; speedX: number; speedY: number; drift: number }[] = [];
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      initMotes();
+    };
+
+    const initMotes = () => {
+      motes = [];
+      const count = 120;
+      for (let i = 0; i < count; i++) {
+        motes.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          size: Math.random() * 3 + 1,
+          alpha: Math.random() * 0.4,
+          speedX: (Math.random() - 0.5) * 0.3,
+          speedY: (Math.random() - 0.5) * 0.3,
+          drift: Math.random() * 0.002
+        });
+      }
+    };
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      motes.forEach((mote) => {
+        mote.x += mote.speedX;
+        mote.y += mote.speedY;
+        mote.alpha += mote.drift;
+        if (mote.alpha > 0.6 || mote.alpha < 0.05) mote.drift *= -1;
+
+        if (mote.x > canvas.width) mote.x = 0;
+        if (mote.x < 0) mote.x = canvas.width;
+        if (mote.y > canvas.height) mote.y = 0;
+        if (mote.y < 0) mote.y = canvas.height;
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${mote.alpha})`;
+        ctx.beginPath();
+        ctx.arc(mote.x, mote.y, mote.size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add a very subtle glow to the motes
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = 'rgba(255,255,255,0.2)';
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      });
+      animationFrameId = requestAnimationFrame(draw);
+    };
+
+    window.addEventListener('resize', resize);
+    resize();
+    draw();
+
+    return () => {
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="absolute inset-0 z-10 pointer-events-none mix-blend-screen" />;
 };
 
 export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({ 
@@ -632,12 +782,13 @@ export const WeatherBackground: React.FC<WeatherBackgroundProps> = ({
             </AnimatePresence>
 
             {/* Night Stars */}
-            {!isDay && (atmosphere === 'clear' || atmosphere === 'cloudy' || atmosphere === 'fog') && <StarField />}
+            {!isDay && <StarField />}
 
             {/* Sunny Day Light Rays & Glare */}
             {isDay && atmosphere === 'clear' && (
               <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <SunGlare />
+                <DustMotes />
                 {/* Main Light Ray System */}
                 {[...Array(3)].map((_, i) => (
                   <motion.div

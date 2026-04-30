@@ -12,9 +12,10 @@ interface ForecastSectionProps {
   daily: DailyForecast[];
   units: UnitSettings;
   timezone?: string;
+  isAtmosphereMode?: boolean;
 }
 
-export const ForecastSection: React.FC<ForecastSectionProps> = ({ hourly, daily, units, timezone }) => {
+export const ForecastSection: React.FC<ForecastSectionProps> = ({ hourly, daily, units, timezone, isAtmosphereMode = true }) => {
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
   // Show the next 24 hours from current local time in that timezone
@@ -36,9 +37,12 @@ export const ForecastSection: React.FC<ForecastSectionProps> = ({ hourly, daily,
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Hourly Forecast (Default/Today) */}
-      <div className="lg:col-span-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-[32px] p-6 sm:p-8 overflow-hidden">
+      <div className={cn(
+        "lg:col-span-2 border rounded-[32px] p-6 sm:p-8 overflow-hidden",
+        isAtmosphereMode ? "bg-white/5 backdrop-blur-md border-white/10" : "bg-white/10 border-white/20"
+      )}>
         <h3 className="text-[11px] uppercase tracking-[0.2em] font-bold text-white/40 mb-8">Next 24 Hours</h3>
-        <div className="flex gap-4 sm:gap-8 overflow-x-auto pb-4 scrollbar-hide no-scrollbar">
+        <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 scrollbar-hide no-scrollbar">
           {currentHourly.map((item, i) => (
             <motion.div
               key={item.time}
@@ -57,7 +61,7 @@ export const ForecastSection: React.FC<ForecastSectionProps> = ({ hourly, daily,
                 damping: 25,
                 delay: i * 0.02
               }}
-              className="flex flex-col items-center gap-4 min-w-[76px] p-5 rounded-[24px] border border-transparent hover:border-white/10 transition-colors cursor-pointer group"
+              className="flex flex-col items-center gap-3 min-w-[80px] p-4 rounded-[24px] border border-transparent hover:border-white/10 transition-colors cursor-pointer group"
             >
               <span className="text-[10px] uppercase tracking-widest font-black text-white/30 group-hover:text-white/60 transition-colors">
                 {format(parseISO(item.time), 'HH:mm')}
@@ -70,12 +74,15 @@ export const ForecastSection: React.FC<ForecastSectionProps> = ({ hourly, daily,
                   </div>
                 )}
               </div>
-              <div className="flex flex-col items-center gap-1 transition-transform group-hover:scale-110">
+              <div className="flex flex-col items-center transition-transform group-hover:scale-105">
                 <span className="text-xl font-bold tracking-tighter text-white">
                   {convertTemperature(item.temp, units.temperature)}°
                 </span>
+                <span className="text-[9px] font-medium text-white/40 uppercase tracking-tighter">
+                  Feels {convertTemperature(item.feelsLike, units.temperature)}°
+                </span>
                 {item.precipitation > 0 && (
-                  <span className="text-[8px] font-black text-sky-400 tabular-nums">
+                  <span className="text-[8px] font-black text-sky-400 tabular-nums mt-1">
                     {item.precipitation.toFixed(1)}mm
                   </span>
                 )}
@@ -86,7 +93,10 @@ export const ForecastSection: React.FC<ForecastSectionProps> = ({ hourly, daily,
       </div>
 
       {/* Daily Forecast */}
-      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-[32px] p-6 sm:p-8">
+      <div className={cn(
+        "border rounded-[32px] p-6 sm:p-8",
+        isAtmosphereMode ? "bg-white/5 backdrop-blur-md border-white/10" : "bg-white/10 border-white/20"
+      )}>
         <h3 className="text-[11px] uppercase tracking-[0.2em] font-bold text-white/40 mb-8">7-Day Forecast</h3>
         <div className="space-y-4">
           {daily.map((item, i) => {
@@ -127,12 +137,17 @@ export const ForecastSection: React.FC<ForecastSectionProps> = ({ hourly, daily,
                       </div>
                     )}
                     <WeatherIcon code={item.conditionCode} size={24} />
-                    <div className="flex gap-4 min-w-[80px] justify-end items-center">
-                      <span className="text-white font-bold">
-                        {convertTemperature(item.maxTemp, units.temperature)}°
-                      </span>
-                      <span className="text-white/30 font-medium text-sm">
-                        {convertTemperature(item.minTemp, units.temperature)}°
+                    <div className="flex flex-col items-end min-w-[100px]">
+                      <div className="flex gap-4 justify-end items-center">
+                        <span className="text-white font-bold">
+                          {convertTemperature(item.maxTemp, units.temperature)}°
+                        </span>
+                        <span className="text-white/30 font-medium text-sm">
+                          {convertTemperature(item.minTemp, units.temperature)}°
+                        </span>
+                      </div>
+                      <span className="text-[8px] font-medium text-white/20 uppercase tracking-tighter">
+                        Feels up to {convertTemperature(item.maxfeelsLike, units.temperature)}°
                       </span>
                     </div>
                   </div>
@@ -145,18 +160,34 @@ export const ForecastSection: React.FC<ForecastSectionProps> = ({ hourly, daily,
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.3, ease: "easeOut" }}
-                      className="overflow-hidden bg-white/5 rounded-2xl p-4"
+                      className="overflow-hidden bg-white/5 rounded-2xl p-5 border border-white/5"
                     >
-                      <div className="flex gap-6 overflow-x-auto no-scrollbar pb-2">
+                      <h4 className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-4">Detailed Daily Breakdown</h4>
+                      <div className="flex gap-6 overflow-x-auto no-scrollbar pb-3">
                         {dayHourly.map((h) => (
-                          <div key={h.time} className="flex flex-col items-center gap-2 min-w-[50px]">
-                            <span className="text-[9px] font-bold text-white/30 uppercase tracking-tighter">
+                          <div key={h.time} className="flex flex-col items-center gap-3 min-w-[64px] p-2 rounded-xl hover:bg-white/5 transition-colors group/item">
+                            <span className="text-[9px] font-bold text-white/30 group-hover/item:text-white/50 transition-colors uppercase tracking-tighter">
                               {format(parseISO(h.time), 'ha')}
                             </span>
-                            <WeatherIcon code={h.conditionCode} isDay={h.isDay} size={18} />
-                            <span className="text-xs font-black text-white/80">
-                              {convertTemperature(h.temp, units.temperature)}°
-                            </span>
+                            <div className="relative">
+                              <WeatherIcon code={h.conditionCode} isDay={h.isDay} size={22} />
+                              {h.precipitation > 0 && (
+                                <div className="absolute -top-1 -right-1 bg-sky-500 w-2 h-2 rounded-full border border-[#020617]" />
+                              )}
+                            </div>
+                            <div className="flex flex-col items-center">
+                              <span className="text-sm font-black text-white">
+                                {convertTemperature(h.temp, units.temperature)}°
+                              </span>
+                              <span className="text-[8px] font-medium text-white/30 tabular-nums">
+                                {convertTemperature(h.feelsLike, units.temperature)}°
+                              </span>
+                            </div>
+                            {h.precipitation > 0 && (
+                              <span className="text-[8px] font-bold text-sky-400">
+                                {h.precipitation.toFixed(1)}mm
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>
