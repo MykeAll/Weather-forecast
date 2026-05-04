@@ -655,9 +655,9 @@ export default function App() {
             <div className={cn(
               "transition-all duration-1000 flex flex-col",
               backgroundMode === 'radar'
-                ? "fixed bottom-0 left-0 w-full px-0 pointer-events-auto z-[90]"
+                ? "fixed bottom-0 left-0 w-full px-0 pointer-events-none z-[90]"
               : backgroundMode === 'globe'
-                ? "fixed bottom-12 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 pointer-events-auto z-40" 
+                ? "fixed bottom-12 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 pointer-events-none z-40" 
                 : "flex-1 max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8"
             )}>
               {/* High-Impact Hero Section */}
@@ -666,11 +666,11 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 className={cn(
-                   "relative rounded-none overflow-hidden group transition-all duration-700 shrink-0",
+                   "relative rounded-none overflow-hidden group transition-all duration-700 shrink-0 pointer-events-auto",
                    backgroundMode === 'radar'
                      ? "p-4 px-6 md:px-12 bg-transparent border-none rounded-none shadow-none"
                      : backgroundMode === 'globe'
-                     ? "p-8 bg-black/40 backdrop-blur-3xl border border-white/10 rounded-[40px]"
+                     ? "p-8 bg-transparent border-none rounded-none"
                      : "p-8 sm:p-12 bg-white/5 backdrop-blur-3xl border border-white/10 shadow-2xl rounded-[40px]"
                 )}
               >
